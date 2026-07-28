@@ -1,5 +1,5 @@
 ---
-title: "CP2 Year 1 Control Seed Viability"
+title: "CP2 Lab Control Seed Viability"
 author: "Xiqi Zheng"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output:
