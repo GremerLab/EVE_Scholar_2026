@@ -1,0 +1,290 @@
+---
+title: "CP2 Year 1 Control Seed Viability"
+author: "Xiqi Zheng"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
+                      fig.width = 9, fig.height = 6, dpi = 300)
+
+library(tidyverse)
+library(broom)
+library(flextable)
+library(knitr)
+```
+
+# Analysis overview
+
+Each control seed is treated as one replicate. Seed viability is therefore a binary response: 1 = viable and 0 = not viable.
+
+The analysis is repeated using three definitions of viability:
+
+1. Category 1 only
+2. Categories 1 and 2
+3. Categories 1, 2, and 3
+
+Because the response is binary, the binomial logistic regression is treated as the primary model. A linear model and ANOVA are also included as requested.
+
+```{r read-data}
+control_data <- read.csv(
+  "../data/STTO Viability Data - Y1_Control_lab_stored_seed_viability_data.csv"
+)
+
+pop_order <- c(
+  "TM2", "BH", "SC", "IH", "LV2",
+  "WL1", "DPR", "WL2", "WL3", "YOSE1", "SQ3"
+)
+
+control_data <- control_data %>%
+  mutate(
+    Pop = factor(Pop, levels = pop_order),
+    Viability_category = as.numeric(Viability_category)
+  )
+```
+
+```{r analysis-function, include=FALSE}
+run_analysis <- function(data, viable_categories) {
+  analyzed_data <- data %>%
+    mutate(
+      viable = case_when(
+        is.na(Viability_category) ~ NA_real_,
+        Viability_category %in% viable_categories ~ 1,
+        TRUE ~ 0
+      )
+    )
+
+  population_summary <- analyzed_data %>%
+    group_by(Pop) %>%
+    summarise(
+      n = sum(!is.na(viable)),
+      proportion_viable = mean(viable, na.rm = TRUE),
+      se = sqrt(proportion_viable * (1 - proportion_viable) / n),
+      lower_ci = pmax(0, proportion_viable - 1.96 * se),
+      upper_ci = pmin(1, proportion_viable + 1.96 * se),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      `Viability (%)` = round(proportion_viable * 100, 1),
+      `Lower 95% CI (%)` = round(lower_ci * 100, 1),
+      `Upper 95% CI (%)` = round(upper_ci * 100, 1)
+    )
+
+  figure <- ggplot(analyzed_data, aes(x = Pop, y = viable)) +
+    geom_jitter(width = 0.15, height = 0.04, alpha = 0.20,
+                size = 1.4, na.rm = TRUE) +
+    geom_errorbar(
+      data = population_summary,
+      aes(x = Pop, ymin = lower_ci, ymax = upper_ci),
+      width = 0.15,
+      inherit.aes = FALSE
+    ) +
+    geom_point(
+      data = population_summary,
+      aes(x = Pop, y = proportion_viable),
+      size = 3,
+      inherit.aes = FALSE
+    ) +
+    scale_y_continuous(
+      limits = c(-0.08, 1.08),
+      breaks = seq(0, 1, 0.25)
+    ) +
+    labs(
+      x = "Population (ordered by elevation)",
+      y = "Proportion viable"
+    ) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  linear_model <- lm(viable ~ Pop, data = analyzed_data)
+  linear_anova <- anova(linear_model)
+
+  logistic_model <- glm(
+    viable ~ Pop,
+    data = analyzed_data,
+    family = binomial
+  )
+
+  logistic_test <- anova(logistic_model, test = "Chisq")
+
+  list(
+    summary = population_summary,
+    figure = figure,
+    lm = linear_model,
+    lm_anova = linear_anova,
+    glm = logistic_model,
+    glm_test = logistic_test
+  )
+}
+
+format_summary_table <- function(result) {
+  result$summary %>%
+    select(
+      Population = Pop,
+      `Sample size` = n,
+      `Viability (%)`,
+      `Lower 95% CI (%)`,
+      `Upper 95% CI (%)`
+    ) %>%
+    flextable() %>%
+    theme_booktabs() %>%
+    autofit()
+}
+
+format_lm_table <- function(result) {
+  tidy(result$lm_anova) %>%
+    mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+    flextable() %>%
+    theme_booktabs() %>%
+    autofit()
+}
+
+format_glm_test <- function(result) {
+  tidy(result$glm_test) %>%
+    mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+    flextable() %>%
+    theme_booktabs() %>%
+    autofit()
+}
+
+format_glm_coefficients <- function(result) {
+  tidy(result$glm) %>%
+    mutate(across(where(is.numeric), ~ round(.x, 4))) %>%
+    flextable() %>%
+    theme_booktabs() %>%
+    autofit()
+}
+```
+
+# Definition 1: Category 1 only
+
+```{r category-1-analysis, include=FALSE}
+result_1 <- run_analysis(control_data, 1)
+```
+
+## Population summary
+
+```{r category-1-table}
+format_summary_table(result_1)
+```
+
+## Figure
+
+The small jittered points represent individual seeds. The larger points show the mean viability proportion for each population, and the vertical bars show approximate 95% confidence intervals.
+
+```{r category-1-figure, fig.cap="Control seed viability when only Category 1 is considered viable."}
+result_1$figure +
+  labs(
+    title = "CP2 Year 1 Control Seed Viability",
+    subtitle = "Viable = Category 1 only"
+  )
+```
+
+## Linear model and ANOVA
+
+```{r category-1-lm}
+format_lm_table(result_1)
+```
+
+## Binomial logistic regression
+
+```{r category-1-glm-test}
+format_glm_test(result_1)
+```
+
+### Logistic regression coefficients
+
+Coefficients are comparisons with TM2, the reference population.
+
+```{r category-1-glm-coefficients}
+format_glm_coefficients(result_1)
+```
+
+# Definition 2: Categories 1 and 2
+
+```{r category-12-analysis, include=FALSE}
+result_12 <- run_analysis(control_data, c(1, 2))
+```
+
+## Population summary
+
+```{r category-12-table}
+format_summary_table(result_12)
+```
+
+## Figure
+
+```{r category-12-figure, fig.cap="Control seed viability when Categories 1 and 2 are considered viable."}
+result_12$figure +
+  labs(
+    title = "CP2 Year 1 Control Seed Viability",
+    subtitle = "Viable = Categories 1 and 2"
+  )
+```
+
+## Linear model and ANOVA
+
+```{r category-12-lm}
+format_lm_table(result_12)
+```
+
+## Binomial logistic regression
+
+```{r category-12-glm-test}
+format_glm_test(result_12)
+```
+
+### Logistic regression coefficients
+
+```{r category-12-glm-coefficients}
+format_glm_coefficients(result_12)
+```
+
+# Definition 3: Categories 1, 2, and 3
+
+```{r category-123-analysis, include=FALSE}
+result_123 <- run_analysis(control_data, c(1, 2, 3))
+```
+
+## Population summary
+
+```{r category-123-table}
+format_summary_table(result_123)
+```
+
+## Figure
+
+```{r category-123-figure, fig.cap="Control seed viability when Categories 1, 2, and 3 are considered viable."}
+result_123$figure +
+  labs(
+    title = "CP2 Year 1 Control Seed Viability",
+    subtitle = "Viable = Categories 1, 2, and 3"
+  )
+```
+
+## Linear model and ANOVA
+
+```{r category-123-lm}
+format_lm_table(result_123)
+```
+
+## Binomial logistic regression
+
+```{r category-123-glm-test}
+format_glm_test(result_123)
+```
+
+### Logistic regression coefficients
+
+```{r category-123-glm-coefficients}
+format_glm_coefficients(result_123)
+```
+
+# Notes
+
+- TM2 is the reference population in the coefficient tables.
+- The overall ANOVA and likelihood-ratio tests evaluate whether viability differs among populations.
+- SQ3 has a smaller sample size than the other populations, so its estimate is less precise.
+- The confidence intervals shown in the figures are descriptive normal-approximation intervals.
+- The binomial logistic regression is the preferred inferential analysis for the binary seed-level response.
