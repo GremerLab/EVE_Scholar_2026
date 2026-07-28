@@ -2,7 +2,9 @@
 title: "CP2 Year 1 Control Seed Viability"
 author: "Xiqi Zheng"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
-output: word_document
+output:
+  pdf_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -173,13 +175,14 @@ format_summary_table(result_1)
 
 The small jittered points represent individual seeds. The larger points show the mean viability proportion for each population, and the vertical bars show approximate 95% confidence intervals.
 
-```{r category-1-figure, fig.cap="Control seed viability when only Category 1 is considered viable."}
+```{r category-1-figure, fig.cap="Control seed viability when only Category 1 is considered viable.", fig.pos='H'}
 result_1$figure +
   labs(
     title = "CP2 Year 1 Control Seed Viability",
     subtitle = "Viable = Category 1 only"
   )
 ```
+*Figure 1: Control seed viability when Categories 1 is considered viable.*
 
 ## Linear model and ANOVA
 
@@ -191,14 +194,6 @@ format_lm_table(result_1)
 
 ```{r category-1-glm-test}
 format_glm_test(result_1)
-```
-
-### Logistic regression coefficients
-
-Coefficients are comparisons with TM2, the reference population.
-
-```{r category-1-glm-coefficients}
-format_glm_coefficients(result_1)
 ```
 
 # Definition 2: Categories 1 and 2
@@ -222,6 +217,7 @@ result_12$figure +
     subtitle = "Viable = Categories 1 and 2"
   )
 ```
+*Figure 2: Control seed viability when Categories 1 and 2 are considered viable.*
 
 ## Linear model and ANOVA
 
@@ -233,12 +229,6 @@ format_lm_table(result_12)
 
 ```{r category-12-glm-test}
 format_glm_test(result_12)
-```
-
-### Logistic regression coefficients
-
-```{r category-12-glm-coefficients}
-format_glm_coefficients(result_12)
 ```
 
 # Definition 3: Categories 1, 2, and 3
@@ -255,13 +245,14 @@ format_summary_table(result_123)
 
 ## Figure
 
-```{r category-123-figure, fig.cap="Control seed viability when Categories 1, 2, and 3 are considered viable."}
+```{r category-123-figure, fig.cap="Control seed viability when Categories 1, 2, and 3 are considered viable.", fig.pos='H'}
 result_123$figure +
   labs(
     title = "CP2 Year 1 Control Seed Viability",
     subtitle = "Viable = Categories 1, 2, and 3"
   )
 ```
+*Figure 3: Control seed viability when Categories 1, 2, and 3 are considered viable.*
 
 ## Linear model and ANOVA
 
@@ -275,15 +266,7 @@ format_lm_table(result_123)
 format_glm_test(result_123)
 ```
 
-### Logistic regression coefficients
-
-```{r category-123-glm-coefficients}
-format_glm_coefficients(result_123)
-```
-
 # Notes
-
-- TM2 is the reference population in the coefficient tables.
 - The overall ANOVA and likelihood-ratio tests evaluate whether viability differs among populations.
 - SQ3 has a smaller sample size than the other populations, so its estimate is less precise.
 - The confidence intervals shown in the figures are descriptive normal-approximation intervals.
