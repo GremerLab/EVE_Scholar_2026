@@ -1,0 +1,353 @@
+---
+title: "Proportional Viable Seeds: Control vs. CP2 Year 1"
+author: "Xiqi Zheng"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  word_document: default
+  pdf_document:
+    toc: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, fig.width=14, fig.height=8, dpi=300)
+library(tidyverse)
+library(gridExtra)
+library(grid)
+library(gtable)
+library(flextable)
+dir.create("../outputs", showWarnings=FALSE)
+```
+
+# Analysis overview
+
+This report compares proportional seed viability between laboratory-stored control seeds and CP2 Year 1 buried seeds.
+
+- Each control seed is one replicate.
+- Each CP2 `Population × Rep` is one replicate.
+- CP2 Reps 1–10 are included.
+- Difference is calculated as `CP2 - Control`.
+- Error bars represent ±1 SE.
+
+```{r read-data}
+control_raw <- read.csv("../data/STTO Viability Data - Y1_Control_lab_stored_seed_viability_data.csv") %>%
+  select(Pop, Viability_category)
+
+cp2_raw <- read.csv("../data/STTO Viability Data - CP2_Y1_Rep1-10_viability_data.csv") %>%
+  select(Pop, Rep, Viability_category)
+
+pop_order <- c("TM2","BH","SC","IH","LV2","WL1","DPR","WL2","WL3","YOSE1","SQ3")
+max_rep <- 10
+```
+
+```{r helper-function, include=FALSE}
+make_control_cp2_figure <- function(viable_categories, definition_label, output_stub) {
+
+  control_summary <- control_raw %>%
+    mutate(
+      Viability_category = as.numeric(Viability_category),
+      viable = if_else(Viability_category %in% viable_categories, 1, 0)
+    ) %>%
+    filter(!is.na(Viability_category)) %>%
+    group_by(Pop) %>%
+    summarise(
+      control_n = n(),
+      control_prop = mean(viable),
+      control_se = sd(viable) / sqrt(control_n),
+      .groups = "drop"
+    )
+
+  cp2_rep_summary <- cp2_raw %>%
+    mutate(
+      Rep = as.integer(Rep),
+      Viability_category = as.numeric(Viability_category)
+    ) %>%
+    filter(Rep %in% 1:max_rep) %>%
+    group_by(Pop, Rep) %>%
+    summarise(
+      trials = sum(!is.na(Viability_category)),
+      events = sum(Viability_category %in% viable_categories, na.rm=TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(trials > 0) %>%
+    mutate(proportion = events / trials)
+
+  cp2_summary <- cp2_rep_summary %>%
+    group_by(Pop) %>%
+    summarise(
+      cp2_n_reps = n(),
+      cp2_prop = mean(proportion),
+      cp2_se = sd(proportion) / sqrt(cp2_n_reps),
+      .groups = "drop"
+    )
+
+  summary_data <- full_join(control_summary, cp2_summary, by="Pop") %>%
+    mutate(
+      Pop = factor(Pop, levels=pop_order),
+      difference = cp2_prop - control_prop,
+      control_lower = pmax(0, control_prop - control_se),
+      control_upper = pmin(1, control_prop + control_se),
+      cp2_lower = pmax(0, cp2_prop - cp2_se),
+      cp2_upper = pmin(1, cp2_prop + cp2_se)
+    ) %>%
+    arrange(Pop)
+
+  table_data <- summary_data %>%
+    transmute(
+      Population = as.character(Pop),
+      Control = sprintf("%.3f (%.3f)", control_prop, control_se),
+      `CP2 Year 1` = sprintf("%.3f (%.3f)", cp2_prop, cp2_se),
+      `Difference\n(CP2 - Control)` = sprintf("%+.3f", difference)
+    )
+
+  table_theme <- ttheme_minimal(
+    base_size = 10,
+    core = list(
+      fg_params = list(hjust=0.5, x=0.5),
+      bg_params = list(fill="white", col="grey80")
+    ),
+    colhead = list(
+      fg_params = list(fontface="bold", hjust=0.5, x=0.5),
+      bg_params = list(fill="grey95", col="grey65")
+    )
+  )
+
+  table_plot <- tableGrob(table_data, rows=NULL, theme=table_theme)
+
+  # Population names are left in the table theme's default font.
+  # Directly changing gp$fontface can conflict with an existing gp$font
+  # setting in some versions of grid/gridExtra.
+
+  difference_cells <- which(table_plot$layout$name == "core-fg" & table_plot$layout$l == 4)
+  for (i in seq_along(difference_cells)) {
+    value <- summary_data$difference[i]
+    if (!is.na(value)) {
+      table_plot$grobs[[difference_cells[i]]]$gp$col <- ifelse(value < 0, "firebrick", "blue3")
+    }
+  }
+
+  plot_data <- summary_data %>%
+    select(Pop, control_prop, control_lower, control_upper, cp2_prop, cp2_lower, cp2_upper) %>%
+    pivot_longer(
+      cols = -Pop,
+      names_to = c("Condition", ".value"),
+      names_pattern = "(control|cp2)_(prop|lower|upper)"
+    ) %>%
+    mutate(
+      Condition = recode(Condition, control="Control", cp2="CP2 Year 1"),
+      Pop = factor(Pop, levels=rev(pop_order))
+    )
+
+  forest_plot <- ggplot(plot_data, aes(x=prop, y=Pop, color=Condition, shape=Condition)) +
+    geom_vline(xintercept=0.5, linetype="dashed", color="grey75") +
+    geom_errorbar(
+      aes(xmin=lower, xmax=upper),
+      orientation="y",
+      width=0.13,
+      linewidth=0.6,
+      position=position_dodge(width=0.38)
+    ) +
+    geom_point(size=3.1, position=position_dodge(width=0.38)) +
+    scale_color_manual(values=c("Control"="#3B66C4", "CP2 Year 1"="#2F9143")) +
+    scale_shape_manual(values=c("Control"=16, "CP2 Year 1"=15)) +
+    scale_x_continuous(limits=c(0,1), breaks=seq(0,1,0.2)) +
+    labs(x="Proportion viable", y=NULL, color=NULL, shape=NULL) +
+    theme_classic(base_size=12) +
+    theme(
+      legend.position="top",
+      legend.justification="center",
+      axis.text.y=element_text(size=11),
+      axis.title.x=element_text(size=12),
+      plot.margin=margin(5,10,5,5)
+    )
+
+  # Save the table and plot as separate files
+  png(
+    paste0("../outputs/", output_stub, "_table.png"),
+    width=1800,
+    height=1200,
+    res=200
+  )
+  grid.newpage()
+  grid.draw(table_plot)
+  dev.off()
+
+  ggsave(
+    paste0("../outputs/", output_stub, "_plot.png"),
+    forest_plot,
+    width=8,
+    height=6,
+    dpi=300
+  )
+
+  ggsave(
+    paste0("../outputs/", output_stub, "_plot.pdf"),
+    forest_plot,
+    width=8,
+    height=6
+  )
+
+  write.csv(
+    summary_data,
+    paste0("../outputs/", output_stub, "_summary.csv"),
+    row.names=FALSE
+  )
+
+  list(
+    summary_data=summary_data,
+    table=table_plot,
+    plot=forest_plot,
+    definition_label=definition_label
+  )
+}
+```
+
+# Definition 1: Category 1 only
+
+```{r definition-1, include=FALSE}
+result_1 <- make_control_cp2_figure(
+  viable_categories=c(1),
+  definition_label="Viable = Category 1 only",
+  output_stub="Control_CP2_Category1"
+)
+```
+
+## Summary table
+
+```{r definition-1-table, fig.width=8, fig.height=5}
+table1 <- result_1$summary_data %>%
+  transmute(
+    Population = Pop,
+    Control = sprintf("%.3f (%.3f)", control_prop, control_se),
+    `CP2 Year 1` = sprintf("%.3f (%.3f)", cp2_prop, cp2_se),
+    diff = difference,
+    `Difference (CP2 - Control)` = sprintf("%+.3f", difference)
+  )
+
+flextable(table1) %>%
+  color(
+    i = ~ diff > 0,
+    j = "Difference (CP2 - Control)",
+    color = "blue"
+  ) %>%
+  color(
+    i = ~ diff < 0,
+    j = "Difference (CP2 - Control)",
+    color = "red"
+  ) %>%
+  delete_columns("diff") %>%
+  autofit()
+```
+
+## Proportional viability plot
+
+```{r definition-1-plot, fig.width=8, fig.height=6}
+result_1$plot +
+  labs(
+    title="Proportional Viable Seeds: Control vs. CP2 Year 1",
+    subtitle=result_1$definition_label
+  )
+```
+
+*Proportion viable = viable seeds / total tested seeds. Error bars represent ±1 SE. Difference = CP2 − Control.*
+
+# Definition 2: Categories 1 and 2
+
+```{r definition-12, include=FALSE}
+result_12 <- make_control_cp2_figure(
+  viable_categories=c(1,2),
+  definition_label="Viable = Categories 1 and 2",
+  output_stub="Control_CP2_Categories1-2"
+)
+```
+
+## Summary table
+
+```{r definition-12-table, fig.width=8, fig.height=5}
+table1 <- result_12$summary_data %>%
+  transmute(
+    Population = Pop,
+    Control = sprintf("%.3f (%.3f)", control_prop, control_se),
+    `CP2 Year 1` = sprintf("%.3f (%.3f)", cp2_prop, cp2_se),
+    diff = difference,
+    `Difference (CP2 - Control)` = sprintf("%+.3f", difference)
+  )
+
+flextable(table1) %>%
+  color(
+    i = ~ diff > 0,
+    j = "Difference (CP2 - Control)",
+    color = "blue"
+  ) %>%
+  color(
+    i = ~ diff < 0,
+    j = "Difference (CP2 - Control)",
+    color = "red"
+  ) %>%
+  delete_columns("diff") %>%
+  autofit()
+```
+
+## Proportional viability plot
+
+```{r definition-12-plot, fig.width=8, fig.height=6}
+result_12$plot +
+  labs(
+    title="Proportional Viable Seeds: Control vs. CP2 Year 1",
+    subtitle=result_12$definition_label
+  )
+```
+
+*Proportion viable = viable seeds / total tested seeds. Error bars represent ±1 SE. Difference = CP2 − Control.*
+
+# Definition 3: Categories 1, 2, and 3
+
+```{r definition-123, include=FALSE}
+result_123 <- make_control_cp2_figure(
+  viable_categories=c(1,2,3),
+  definition_label="Viable = Categories 1, 2, and 3",
+  output_stub="Control_CP2_Categories1-2-3"
+)
+```
+
+## Summary table
+
+```{r definition-123-table, fig.width=8, fig.height=5}
+table1 <- result_123$summary_data %>%
+  transmute(
+    Population = Pop,
+    Control = sprintf("%.3f (%.3f)", control_prop, control_se),
+    `CP2 Year 1` = sprintf("%.3f (%.3f)", cp2_prop, cp2_se),
+    diff = difference,
+    `Difference (CP2 - Control)` = sprintf("%+.3f", difference)
+  )
+
+flextable(table1) %>%
+  color(
+    i = ~ diff > 0,
+    j = "Difference (CP2 - Control)",
+    color = "blue"
+  ) %>%
+  color(
+    i = ~ diff < 0,
+    j = "Difference (CP2 - Control)",
+    color = "red"
+  ) %>%
+  delete_columns("diff") %>%
+  autofit()
+```
+
+## Proportional viability plot
+
+```{r definition-123-plot, fig.width=8, fig.height=6}
+result_123$plot +
+  labs(
+    title="Proportional Viable Seeds: Control vs. CP2 Year 1",
+    subtitle=result_123$definition_label
+  )
+```
+
+*Proportion viable = viable seeds / total tested seeds. Error bars represent ±1 SE. Difference = CP2 − Control.*
+
+# Output files
+
+The report saves three PNG files, three PDF files, and three CSV summary tables in the `outputs` folder.

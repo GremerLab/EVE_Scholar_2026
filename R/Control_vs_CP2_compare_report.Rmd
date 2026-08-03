@@ -1,0 +1,273 @@
+---
+title: "Control vs CP2 Year 1 Seed Viability"
+author: "Xiqi Zheng"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    toc: false
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 300
+)
+
+library(tidyverse)
+library(emmeans)
+library(broom)
+```
+
+# Analysis overview
+
+This report combines and compares the lab condition stored control seeds and the CP2 Year 1 buried seeds (rep 1-10 for now, 8/3/2026).
+
+- Each control seed is one replicate, with `trials = 1`.
+- Each CP2 `Population × Rep` is one replicate, summarized as viable seeds (`events`) out of tested seeds (`trials`).
+- Control is the treatment reference.
+- CP2 is compared with the corresponding control within each population.
+
+The analysis is repeated using three definitions of viability:
+
+1. Category 1 only
+2. Categories 1 and 2
+3. Categories 1, 2, and 3
+
+```{r read-data}
+control_raw <- read.csv(
+  "../data/STTO Viability Data - Y1_Control_lab_stored_seed_viability_data.csv"
+) %>%
+  select(Pop, Viability_category)
+
+cp2_raw <- read.csv(
+  "../data/STTO Viability Data - CP2_Y1_Rep1-10_viability_data.csv"
+) %>%
+  select(Pop, Rep, Viability_category)
+
+pop_order <- c(
+  "TM2", "BH", "SC", "IH", "LV2",
+  "WL1", "DPR", "WL2", "WL3", "YOSE1", "SQ3"
+)
+```
+
+```{r helper-function, include=FALSE}
+run_combined_analysis <- function(viable_categories, definition_label) {
+
+  # Control: each seed is one replicate
+  control_data <- control_raw %>%
+    mutate(
+      Viability_category = as.numeric(Viability_category),
+      events = if_else(
+        Viability_category %in% viable_categories,
+        1,
+        0
+      ),
+      trials = 1,
+      Treatment = "Control"
+    ) %>%
+    filter(!is.na(Viability_category)) %>%
+    select(Pop, Treatment, events, trials)
+
+  # CP2: each Population × Rep is one replicate
+  cp2_data <- cp2_raw %>%
+    mutate(
+      Rep = as.integer(Rep),
+      Viability_category = as.numeric(Viability_category)
+    ) %>%
+    filter(Rep %in% 1:10) %>%
+    group_by(Pop, Rep) %>%
+    summarise(
+      trials = sum(!is.na(Viability_category)),
+      events = sum(
+        Viability_category %in% viable_categories,
+        na.rm = TRUE
+      ),
+      .groups = "drop"
+    ) %>%
+    filter(trials > 0) %>%
+    mutate(Treatment = "CP2") %>%
+    select(Pop, Treatment, events, trials)
+
+  combined_data <- bind_rows(
+    control_data,
+    cp2_data
+  ) %>%
+    mutate(
+      Pop = factor(Pop, levels = pop_order),
+      Treatment = factor(
+        Treatment,
+        levels = c("Control", "CP2")
+      )
+    )
+
+  model <- glm(
+    cbind(events, trials - events) ~ Pop * Treatment,
+    family = binomial,
+    data = combined_data
+  )
+
+  estimates <- emmeans(
+    model,
+    ~ Treatment | Pop,
+    type = "response"
+  )
+
+  contrasts <- contrast(
+    estimates,
+    method = "revpairwise",
+    adjust = "holm"
+  )
+
+  plot_data <- as.data.frame(estimates)
+
+  figure <- ggplot(
+    plot_data,
+    aes(
+      x = Pop,
+      y = prob,
+      color = Treatment,
+      group = Treatment
+    )
+  ) +
+    geom_errorbar(
+      aes(
+        ymin = asymp.LCL,
+        ymax = asymp.UCL
+      ),
+      width = 0.12,
+      position = position_dodge(width = 0.45)
+    ) +
+    geom_point(
+      size = 3,
+      position = position_dodge(width = 0.45)
+    ) +
+    scale_y_continuous(
+      limits = c(0, 1),
+      breaks = seq(0, 1, 0.25),
+      labels = scales::label_percent()
+    ) +
+    labs(
+      title = "Control vs CP2 Year 1 Seed Viability",
+      subtitle = definition_label,
+      x = "Population",
+      y = "Estimated viability",
+      color = "Condition"
+    ) +
+    theme_classic(base_size = 12) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold")
+    )
+
+  list(
+    model = model,
+    estimates = estimates,
+    contrasts = contrasts,
+    figure = figure
+  )
+}
+```
+
+# Definition 1: Category 1 only
+
+```{r definition-1-analysis, include=FALSE}
+result_1 <- run_combined_analysis(
+  viable_categories = c(1),
+  definition_label = "Viable = Category 1 only"
+)
+```
+
+## Figure
+
+```{r definition-1-figure}
+result_1$figure
+```
+
+## Overall model test
+
+```{r definition-1-model}
+tidy(anova(result_1$model, test = "Chisq")) %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 4))) %>%
+  knitr::kable()
+```
+
+## Control vs CP2 within each population
+
+```{r definition-1-contrasts}
+as.data.frame(result_1$contrasts) %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 4))) %>%
+  knitr::kable()
+```
+
+# Definition 2: Categories 1 and 2
+
+```{r definition-12-analysis, include=FALSE}
+result_12 <- run_combined_analysis(
+  viable_categories = c(1, 2),
+  definition_label = "Viable = Categories 1 and 2"
+)
+```
+
+## Figure
+
+```{r definition-12-figure}
+result_12$figure
+```
+
+## Overall model test
+
+```{r definition-12-model}
+tidy(anova(result_12$model, test = "Chisq")) %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 4))) %>%
+  knitr::kable()
+```
+
+## Control vs CP2 within each population
+
+```{r definition-12-contrasts}
+as.data.frame(result_12$contrasts) %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 4))) %>%
+  knitr::kable()
+```
+
+# Definition 3: Categories 1, 2, and 3
+
+```{r definition-123-analysis, include=FALSE}
+result_123 <- run_combined_analysis(
+  viable_categories = c(1, 2, 3),
+  definition_label = "Viable = Categories 1, 2, and 3"
+)
+```
+
+## Figure
+
+```{r definition-123-figure}
+result_123$figure
+```
+
+## Overall model test
+
+```{r definition-123-model}
+tidy(anova(result_123$model, test = "Chisq")) %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 4))) %>%
+  knitr::kable()
+```
+
+## Control vs CP2 within each population
+
+```{r definition-123-contrasts}
+as.data.frame(result_123$contrasts) %>%
+  mutate(across(where(is.numeric), ~ signif(.x, 4))) %>%
+  knitr::kable()
+```
+
+# Notes
+
+- Control is the reference treatment.
+- Each contrast compares CP2 with the corresponding control within the same population.
+- The `Pop × Treatment` interaction tests whether the Control-to-CP2 change differs among populations.

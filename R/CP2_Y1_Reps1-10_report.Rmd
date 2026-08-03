@@ -1,0 +1,234 @@
+---
+title: "CP2 Year 1 Seed Viability (Reps 1–10)"
+author: "Xiqi Zheng"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: false
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+library(tidyverse)
+library(broom)
+```
+
+# Analysis overview
+
+Each **Population × Rep** is treated as one replicate.
+
+- Trials = total number of seeds tested
+- Events = number of viable seeds
+
+The analysis is repeated using three definitions of viability:
+
+1. Category 1 only
+2. Categories 1 and 2
+3. Categories 1, 2, and 3
+
+```{r}
+seed_data <- read.csv("../data/STTO Viability Data - CP2_Y1_Rep1-10_viability_data.csv")
+
+pop_order <- c("TM2","BH","SC","IH","LV2","WL1","DPR","WL2","WL3","YOSE1","SQ3")
+
+seed_data <- seed_data %>%
+  mutate(Pop=factor(Pop,levels=pop_order))
+```
+
+```{r}
+summarize_rep <- function(data, viable_categories){
+
+  rep_summary <- data %>%
+    filter(Rep %in% 1:10) %>%
+    group_by(Pop,Rep) %>%
+    summarise(
+      trials=sum(!is.na(Viability_category)),
+      events=sum(Viability_category %in% viable_categories, na.rm=TRUE),
+      .groups="drop"
+    ) %>%
+    filter(trials>0) %>%
+    mutate(proportion=events/trials)
+
+  population_summary <- rep_summary %>%
+    group_by(Pop) %>%
+    summarise(
+      Sample_size=n(),
+      Mean=mean(proportion),
+      SE=sd(proportion)/sqrt(n()),
+      Lower_95_CI=pmax(0,Mean-1.96*SE),
+      Upper_95_CI=pmin(1,Mean+1.96*SE),
+      .groups="drop"
+    )
+
+  figure <- ggplot(rep_summary, aes(x = Pop, y = proportion)) +
+
+  geom_boxplot(
+    width = 0.6,
+    outlier.shape = NA,
+    linewidth = 0.6
+  ) +
+
+  stat_boxplot(
+    geom = "errorbar",
+    width = 0.25,
+    linewidth = 0.6
+  ) +
+
+  geom_jitter(
+    width = 0.12,
+    height = 0,
+    size = 2,
+    alpha = 0.6,
+    color = "grey40"
+  ) +
+
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.25)
+  ) +
+
+  theme_classic(base_size = 12) +
+
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    )
+  ) +
+
+  labs(
+    x = "Population",
+    y = "Proportion viable"
+  )
+
+lm_model <- lm(
+  proportion ~ Pop,
+  data = rep_summary
+)
+
+glm_model <- glm(
+  cbind(events, trials - events) ~ Pop,
+  family = binomial,
+  data = rep_summary
+)
+
+list(
+  population_summary = population_summary,
+  figure = figure,
+  lm = lm_model,
+  glm = glm_model
+)
+
+  lm_model <- lm(proportion~Pop,data=rep_summary)
+
+  glm_model <- glm(
+    cbind(events,trials-events)~Pop,
+    family=binomial,
+    data=rep_summary
+  )
+
+  list(
+    population_summary=population_summary,
+    figure=figure,
+    lm=lm_model,
+    glm=glm_model
+  )
+}
+```
+
+# Definition 1: Category 1 only
+
+```{r}
+result_1 <- summarize_rep(seed_data,1)
+```
+
+## Population summary
+
+```{r}
+knitr::kable(result_1$population_summary,digits=3)
+```
+
+## Figure
+
+```{r}
+result_1$figure +
+  labs(title="CP2 Year 1 Seed Viability",
+       subtitle="Viable = Category 1")
+```
+
+## Linear model and ANOVA
+
+```{r}
+knitr::kable(tidy(anova(result_1$lm)))
+```
+
+## Binomial logistic regression
+
+```{r}
+knitr::kable(tidy(anova(result_1$glm,test="Chisq")))
+```
+
+# Definition 2: Categories 1 and 2
+
+```{r}
+result_12 <- summarize_rep(seed_data,c(1,2))
+```
+
+## Population summary
+
+```{r}
+knitr::kable(result_12$population_summary,digits=3)
+```
+
+## Figure
+
+```{r}
+result_12$figure +
+  labs(title="CP2 Year 1 Seed Viability",
+       subtitle="Viable = Categories 1 and 2")
+```
+
+## Linear model and ANOVA
+
+```{r}
+knitr::kable(tidy(anova(result_12$lm)))
+```
+
+## Binomial logistic regression
+
+```{r}
+knitr::kable(tidy(anova(result_12$glm,test="Chisq")))
+```
+
+# Definition 3: Categories 1, 2 and 3
+
+```{r}
+result_123 <- summarize_rep(seed_data,c(1,2,3))
+```
+
+## Population summary
+
+```{r}
+knitr::kable(result_123$population_summary,digits=3)
+```
+
+## Figure
+
+```{r}
+result_123$figure +
+  labs(title="CP2 Year 1 Seed Viability",
+       subtitle="Viable = Categories 1, 2 and 3")
+```
+
+## Linear model and ANOVA
+
+```{r}
+knitr::kable(tidy(anova(result_123$lm)))
+```
+
+## Binomial logistic regression
+
+```{r}
+knitr::kable(tidy(anova(result_123$glm,test="Chisq")))
+```
