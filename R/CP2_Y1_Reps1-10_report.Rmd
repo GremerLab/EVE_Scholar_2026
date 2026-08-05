@@ -1,234 +1,376 @@
 ---
-title: "CP2 Year 1 Seed Viability (Reps 1–10)"
-author: "Xiqi Zheng"
-date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    toc: false
-  word_document: default
+  pdf_document: default
+  html_document: default
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
-library(tidyverse)
-library(broom)
-```
-
-# Analysis overview
-
-Each **Population × Rep** is treated as one replicate.
-
-- Trials = total number of seeds tested
-- Events = number of viable seeds
-
-The analysis is repeated using three definitions of viability:
-
-1. Category 1 only
-2. Categories 1 and 2
-3. Categories 1, 2, and 3
-
 ```{r}
+#lookup table
+library(tidyverse)
+elevation_df <- tibble(
+  Pop = c("TM2","BH","SC","WL1","WL2","WL3","DPR","IH","YOSE1","LV2","SQ3"),
+  Elev_m = c(379, 511, 422, 1614, 2020, 2138, 1019, 454, 2141, 2500, 2373)
+)
+
+#join data
 seed_data <- read.csv("../data/STTO Viability Data - CP2_Y1_Rep1-10_viability_data.csv")
+seed_data <- seed_data %>%
+  left_join(elevation_df, by = "Pop")
 
-pop_order <- c("TM2","BH","SC","IH","LV2","WL1","DPR","WL2","WL3","YOSE1","SQ3")
-
+#order population based on ascending elevation
+pop_order <- elevation_df %>%
+  arrange(Elev_m) %>%
+  pull(Pop)
 seed_data <- seed_data %>%
   mutate(Pop=factor(Pop,levels=pop_order))
 ```
 
 ```{r}
-summarize_rep <- function(data, viable_categories){
+#check whether Rep is integer and viability category is number
+seed_data <- seed_data %>%
+  mutate(Rep=as.integer(Rep), Viability_category=as.numeric(Viability_category))
+```
 
-  rep_summary <- data %>%
-    filter(Rep %in% 1:10) %>%
-    group_by(Pop,Rep) %>%
-    summarise(
-      trials=sum(!is.na(Viability_category)),
-      events=sum(Viability_category %in% viable_categories, na.rm=TRUE),
-      .groups="drop"
-    ) %>%
-    filter(trials>0) %>%
-    mutate(proportion=events/trials)
+# Replicate Summary
+```{r}
+# Definition1: Category 1 only viable
+rep_summary_1 <- seed_data %>%
+  group_by(Pop, Elev_m, Rep) %>%
+  summarise(
+    trials = sum(!is.na(Viability_category)), #check whether there is not NA
+    events = sum(Viability_category == 1, na.rm = TRUE), #check how many category 1 seeds in the rep
+    .groups = "drop" #cancel group after summarise finished
+  ) %>%
+  filter (trials >0) %>% #delete no data group
+  mutate(proportion = events/trials)
+```
 
-  population_summary <- rep_summary %>%
-    group_by(Pop) %>%
-    summarise(
-      Sample_size=n(),
-      Mean=mean(proportion),
-      SE=sd(proportion)/sqrt(n()),
-      Lower_95_CI=pmax(0,Mean-1.96*SE),
-      Upper_95_CI=pmin(1,Mean+1.96*SE),
-      .groups="drop"
-    )
+```{r}
+# Definition 2: Category 1+2  viable
+rep_summary_12 <- seed_data %>%
+  group_by(Pop, Elev_m, Rep) %>%
+  summarise(
+    trials = sum(!is.na(Viability_category)), #check whether there is not NA
+    events = sum(Viability_category %in% c(1, 2), na.rm = TRUE), #check whether each viability category are 1 or 2
+    .groups = "drop" #cancel group after summarise finished
+  ) %>%
+  filter (trials >0) %>% #delete no data group
+  mutate(proportion = events/trials)
+```
 
-  figure <- ggplot(rep_summary, aes(x = Pop, y = proportion)) +
+```{r}
+# Definition 3: Category 1+2+3  viable
+rep_summary_123 <- seed_data %>%
+  group_by(Pop, Elev_m, Rep) %>%
+  summarise(
+    trials = sum(!is.na(Viability_category)), #check whether there is not NA
+    events = sum(Viability_category %in% c(1, 2, 3), na.rm = TRUE), #check whether each viability category are 1 or 2 or 3
+    .groups = "drop" #cancel group after summarise finished
+  ) %>%
+  filter (trials >0) %>% #delete no data group
+  mutate(proportion = events/trials)
+```
 
-  geom_boxplot(
-    width = 0.6,
-    outlier.shape = NA,
-    linewidth = 0.6
-  ) +
+# Population summary
 
-  stat_boxplot(
-    geom = "errorbar",
-    width = 0.25,
-    linewidth = 0.6
-  ) +
+```{r}
+#Definition 1
+population_summary_1 <- rep_summary_1 %>%
+group_by(Pop, Elev_m) %>% #group replicates by population
+  summarise( #summarize each population
+    n_reps = n(), #number of rep groups
+    mean_proportion = mean(proportion), #mean viable proportion
+    SE = sd(proportion)/sqrt(n()), #standard error of the mean
+    .groups = "drop"
+  ) %>%
+  arrange(Elev_m) #order populations by elevation
+```
 
-  geom_jitter(
-    width = 0.12,
-    height = 0,
-    size = 2,
-    alpha = 0.6,
-    color = "grey40"
-  ) +
+```{r}
+#Definition 2
+population_summary_12 <- rep_summary_12 %>%
+group_by(Pop, Elev_m) %>%
+  summarise(
+    n_reps = n(),
+    mean_proportion = mean(proportion),
+    SE = sd(proportion)/sqrt(n()),
+    .groups = "drop"
+  )%>%
+  arrange(Elev_m)
+```
 
-  scale_y_continuous(
-    limits = c(0, 1),
-    breaks = seq(0, 1, 0.25)
-  ) +
+```{r}
+#Definition 3
+population_summary_123 <- rep_summary_123 %>%
+group_by(Pop, Elev_m) %>%
+  summarise(
+    n_reps = n(),
+    mean_proportion = mean(proportion),
+    SE = sd(proportion)/sqrt(n()),
+    .groups = "drop"
+  )%>%
+  arrange(Elev_m)
+```
 
-  theme_classic(base_size = 12) +
+# Linear Regression
 
-  theme(
-    axis.text.x = element_text(
-      angle = 45,
-      hjust = 1
-    )
-  ) +
-
-  labs(
-    x = "Population",
-    y = "Proportion viable"
-  )
-
-lm_model <- lm(
-  proportion ~ Pop,
-  data = rep_summary
+```{r}
+#Definition 1
+lm_1 <- lm( #fit a linear regression model
+  proportion ~ Elev_m, #test whether viability changes by elevation
+  data = rep_summary_1 #use rep level data
 )
+```
 
-glm_model <- glm(
-  cbind(events, trials - events) ~ Pop,
+```{r}
+#Definition 2
+lm_12 <- lm( #fit a linear regression model
+  proportion ~ Elev_m, #test whether viability changes by elevation
+  data = rep_summary_12 #use rep level data
+)
+```
+
+```{r}
+#Definition 3
+lm_123 <- lm( #fit a linear regression model
+  proportion ~ Elev_m, #test whether viability changes by elevation
+  data = rep_summary_123 #use rep level data
+)
+```
+
+# Binomial Logistic Regression
+
+```{r}
+#Definition 1
+glm_1 <- glm( #fit a binomial logistic regression model
+  cbind(events, trials - events) ~ Elev_m, #model viable and non-viable seeds as a function of elevation
+  family = binomial, #use binomial error distribution
+  data = rep_summary_1 #use rep level summary data
+)
+```
+
+```{r}
+#Definition 2
+glm_12 <- glm(
+  cbind(events, trials - events) ~ Elev_m,
   family = binomial,
-  data = rep_summary
+  data = rep_summary_12
 )
+```
 
-list(
-  population_summary = population_summary,
-  figure = figure,
-  lm = lm_model,
-  glm = glm_model
+```{r}
+#Definition 3
+glm_123 <- glm(
+  cbind(events, trials - events) ~ Elev_m,
+  family = binomial,
+  data = rep_summary_123
 )
+```
 
-  lm_model <- lm(proportion~Pop,data=rep_summary)
+# Prediction Data
 
-  glm_model <- glm(
-    cbind(events,trials-events)~Pop,
-    family=binomial,
-    data=rep_summary
+```{r}
+#Definition 1
+prediction_1 <- data.frame( #create a new dataset for prediction
+  Elev_m = seq( #generate a sequence of elevations
+    min(rep_summary_1$Elev_m), #lowest elevation
+    max(rep_summary_1$Elev_m), #highest elevation
+    length.out = 100 #create 100 evenly spaced values
   )
+)
+```
 
-  list(
-    population_summary=population_summary,
-    figure=figure,
-    lm=lm_model,
-    glm=glm_model
+```{r}
+#Definition 2
+prediction_12 <- data.frame(
+  Elev_m = seq(
+    min(rep_summary_12$Elev_m),
+    max(rep_summary_12$Elev_m),
+    length.out = 100
   )
-}
+)
 ```
 
-# Definition 1: Category 1 only
-
 ```{r}
-result_1 <- summarize_rep(seed_data,1)
+#Definition 3
+prediction_123 <- data.frame(
+  Elev_m = seq(
+    min(rep_summary_123$Elev_m),
+    max(rep_summary_123$Elev_m),
+    length.out = 100
+  )
+)
 ```
 
-## Population summary
+# Prediction Model
 
 ```{r}
-knitr::kable(result_1$population_summary,digits=3)
+#Definition 1
+prediction_1$predicted <- predict( #predict viability from the fitted model
+  glm_1, #use the belonged logistic model
+  newdata = prediction_1, #predict at each elevation
+  type = "response" #return predicted probabilities
+)
 ```
 
-## Figure
-
 ```{r}
-result_1$figure +
-  labs(title="CP2 Year 1 Seed Viability",
-       subtitle="Viable = Category 1")
+#Definition 2
+prediction_12$predicted <- predict(
+  glm_12,
+  newdata = prediction_12,
+  type = "response"
+)
 ```
 
-## Linear model and ANOVA
-
 ```{r}
-knitr::kable(tidy(anova(result_1$lm)))
+#Definition 3
+prediction_123$predicted <- predict(
+  glm_123,
+  newdata = prediction_123,
+  type = "response"
+)
 ```
 
-## Binomial logistic regression
+# Plots
 
 ```{r}
-knitr::kable(tidy(anova(result_1$glm,test="Chisq")))
+#Definition 1
+figure_1 <- ggplot(population_summary_1, aes (x = Elev_m, y = mean_proportion)) + 
+  geom_point(size = 3) + #population mean
+  geom_errorbar(
+    aes(
+      ymin = mean_proportion - SE,
+      ymax = mean_proportion + SE
+    ),
+    width = 40
+  ) + #standard error
+  geom_line( #predicted trendline
+    data = prediction_1,
+    aes(x=Elev_m, y = predicted),
+    linewidth = 1, color = "red"
+  ) +
+  geom_text( #each point label
+    aes(label = Pop),
+    vjust = 5,
+    size = 3
+  ) +
+  scale_x_continuous( #x-axis range
+    breaks = seq(250, 2500, by = 200),
+    limits = c(300, 2600)
+  ) +
+  scale_y_continuous( #y-axis range
+    limits = c(0,1)
+  ) +
+  theme_classic() + 
+  labs(
+    x = "Elevation (m)",
+    y = "Proportion Viable"
+  )
 ```
 
-# Definition 2: Categories 1 and 2
-
 ```{r}
-result_12 <- summarize_rep(seed_data,c(1,2))
+#Definition 2
+figure_12 <- ggplot(population_summary_12, aes (x = Elev_m, y = mean_proportion)) + 
+  geom_point(size = 3) + #population mean
+  geom_errorbar(
+    aes(
+      ymin = mean_proportion - SE,
+      ymax = mean_proportion + SE
+    ),
+    width = 40
+  ) + #standard error
+  geom_line( #predicted trendline
+    data = prediction_12,
+    aes(x=Elev_m, y = predicted),
+    linewidth = 1, color = "red"
+  ) +
+  geom_text( #each point label
+    aes(label = Pop),
+    vjust = 5,
+    size = 3
+  ) +
+  scale_x_continuous( #x-axis range
+    breaks = seq(250, 2500, by = 200),
+    limits = c(300, 2600)
+  ) +
+  scale_y_continuous( #y-axis range
+    limits = c(0,1)
+  ) +
+  theme_classic() + 
+  labs(
+    x = "Elevation (m)",
+    y = "Proportion Viable"
+  )
 ```
 
-## Population summary
-
 ```{r}
-knitr::kable(result_12$population_summary,digits=3)
+#Definition 3
+figure_123 <- ggplot(population_summary_123, aes (x = Elev_m, y = mean_proportion)) + 
+  geom_point(size = 3) + #population mean
+  geom_errorbar(
+    aes(
+      ymin = mean_proportion - SE,
+      ymax = mean_proportion + SE
+    ),
+    width = 40
+  ) + #standard error
+  geom_line( #predicted trendline
+    data = prediction_123,
+    aes(x=Elev_m, y = predicted),
+    linewidth = 1, color = "red"
+  ) +
+  geom_text( #each point label
+    aes(label = Pop),
+    vjust = 5,
+    size = 3
+  ) +
+  scale_x_continuous( #x-axis range
+    breaks = seq(250, 2500, by = 200),
+    limits = c(300, 2600)
+  ) +
+  scale_y_continuous( #y-axis range
+    limits = c(0,1)
+  ) +
+  theme_classic() + 
+  labs(
+    x = "Elevation (m)",
+    y = "Proportion Viable"
+  )
 ```
 
-## Figure
+# Outputs
 
 ```{r}
-result_12$figure +
-  labs(title="CP2 Year 1 Seed Viability",
-       subtitle="Viable = Categories 1 and 2")
+#Definition 1
+##Population Summary
+print(population_summary_1)
+##Linear Regression
+print(summary(lm_1))
+##Binomial Logistic Regression
+print(summary(glm_1))
+##Figure
+print(figure_1)
 ```
 
-## Linear model and ANOVA
-
 ```{r}
-knitr::kable(tidy(anova(result_12$lm)))
+#Definition 2
+##Population Summary
+print(population_summary_12)
+##Linear Regression
+print(summary(lm_12))
+##Binomial Logistic Regression
+print(summary(glm_12))
+##Figure
+print(figure_12)
 ```
 
-## Binomial logistic regression
-
 ```{r}
-knitr::kable(tidy(anova(result_12$glm,test="Chisq")))
-```
-
-# Definition 3: Categories 1, 2 and 3
-
-```{r}
-result_123 <- summarize_rep(seed_data,c(1,2,3))
-```
-
-## Population summary
-
-```{r}
-knitr::kable(result_123$population_summary,digits=3)
-```
-
-## Figure
-
-```{r}
-result_123$figure +
-  labs(title="CP2 Year 1 Seed Viability",
-       subtitle="Viable = Categories 1, 2 and 3")
-```
-
-## Linear model and ANOVA
-
-```{r}
-knitr::kable(tidy(anova(result_123$lm)))
-```
-
-## Binomial logistic regression
-
-```{r}
-knitr::kable(tidy(anova(result_123$glm,test="Chisq")))
+#Definition 3
+##Population Summary
+print(population_summary_123)
+##Linear Regression
+print(summary(lm_123))
+##Binomial Logistic Regression
+print(summary(glm_123))
+##Figure
+print(figure_123)
 ```
