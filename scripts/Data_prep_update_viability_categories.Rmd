@@ -22,7 +22,7 @@ The current Viability_category column scored partially stained seeds 3
 If a seed with Viability_category = 3 and More_50_stain = 1, then in a new column called Updated_viability_cat, these seeds should be scored a 1 and all othere seeds should keep the same number as in Viability_category
 
 To-Do:
-Need to check if these seeds have a fully stained hypocotyl/radicle as well - DONE confirmed recieving a 1 in the More_50_stain column meant the hypocotyl is fully stained and at least half of the cotyledons are stained
+Need to check if these seeds have a fully stained hypocotyl/radicle as well - DONE confirmed receiving a 1 in the More_50_stain column meant the hypocotyl is fully stained and at least half of the cotyledons are stained
 Add Purple_staining and More_50_staining columns to the control Y1 dataset 
 
 ```{r}
@@ -30,8 +30,4 @@ CP2_Y1_elev <- CP2_Y1_elev %>%
   mutate(Updated_viability_cat = ifelse(Viability_category == 3 & More_50_stain == 1, 1, Viability_category)) #create new col called Updated_viability_cat and fill the rows with a 1 if conditions are met or copy over the values from the Viability_category column if not
 ```
 
-```{r}
-CP2_seeds_to_check <- CP2_Y1_elev %>%
-  filter(Viability_category == 3 & More_50_stain == 1)
-```
 
