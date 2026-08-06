@@ -1,0 +1,12 @@
+Pop,Elev_m,Elev_class,Num_mf,Seeds_per_bag,Reps,Total_seeds,Seeds_per_mf,Notes,,
+TM2,379,low,45,10,30,300,6.666666667,"use 7 seeds from 30 mf, otherwise 6",done,done
+BH,511,low,20,10,30,300,15,,done,done
+SC,422,low,19,10,30,300,15.78947368,"use 16 seeds from 15 mf, otherwise 15 ",done,done
+WL1,1614,mid,30,10,30,300,10,,done,done
+WL2,2020,high,27,10,30,300,11.11111111,"use 12 seeds from 3 mf, otherwise 11",done,done
+WL3,2138,high,20,10,30,300,15,,done,done
+DPR,1019,mid,20,10,30,300,15,,done,done
+IH,454,low,30,10,30,300,10,,done,
+YOSE1,2141,high,24,9,30,270,12.5,"use 13 seeds from 12 mf, otherwise 12",done,
+LV2,2500,high,8,8,30,240,30,,done,
+SQ3,2373,high,10,4,20,80,10,,done,
