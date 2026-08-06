@@ -1,0 +1,32 @@
+---
+title: "Data_prep_merge_elev_info"
+output: html_document
+date: "2026-08-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+Load in the data
+```{r}
+Elev <- read_csv("../input/Pop_elev_data.csv")
+CP2_Y1 <- read_csv("../input/CP2_Y1_viability_data.csv")
+Control_Y1 <- read_csv("../input/Y1_Control_lab_stored_seed_viability_data.csv")
+```
+Add in the elevation data
+```{r}
+Elev <- Elev %>%
+  select(c("Pop", "Elev_m", "Elev_class")) #Selecting relevant columns to join with other data sets
+
+Control_Y1 <- Control_Y1 %>%
+  left_join(Elev, by="Pop") #join in elevation and elevation class using the pop codes
+
+CP2_Y1 <- CP2_Y1 %>%
+  left_join(Elev, by="Pop") #join in elevation and elevation class using the pop codes
+```
+
+
