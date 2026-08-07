@@ -28,6 +28,7 @@ Add Purple_staining and More_50_staining columns to the control Y1 dataset
 ```{r}
 CP2_Y1_elev <- CP2_Y1_elev %>%
   mutate(Updated_viability_cat = ifelse(Viability_category == 3 & More_50_stain == 1, 1, Viability_category)) #create new col called Updated_viability_cat and fill the rows with a 1 if conditions are met or copy over the values from the Viability_category column if not
+
+Control_Y1_elev <- Control_Y1_elev %>%
+  mutate(Updated_viability_cat = ifelse(Viability_category == 3 & More_50_stain == 1, 1, Viability_category)) #create new col called Updated_viability_cat and fill the rows with a 1 if conditions are met or copy over the values from the Viability_category column if not
 ```
-
-
