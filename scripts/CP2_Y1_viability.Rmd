@@ -1,0 +1,102 @@
+---
+title: "CP2_Y1_viability"
+output: html_document
+date: "2026-08-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+CP2_Y1 <- read.csv("../output/CP2_Y1_w_elev.csv") %>%
+  filter(!(Pop == "WL1" & Rep == 14)) #filter WL1 rep14, because there is no seeds in WL1 rep14 but we have marked it in the spreadsheet; without filter, the NA will be include in the SE and cause all the reps of WL1 become NA
+```
+
+```{r}
+rep_sum_1 <- CP2_Y1 %>%
+  group_by (Pop, Elev_m, Rep) %>% #group seeds data by population, elevation and replicates
+  summarise (
+    trails = sum (!is.na(Updated_viability_cat)), #count how many seeds we have tested in each replicate and remove the cell with NA data in the Updated_viability_cat (some rows are empty seed coat or like WL1 rep14 is an empty envelope)
+    events = sum (Updated_viability_cat == 1, na.rm = TRUE), #count how many seeds are considered as viable (category 1)
+    .groups = "drop"
+  ) %>%
+  mutate (proportion = events/trails) #calculate viable proportion of each replicate
+
+pop_sum_1 <- rep_sum_1 %>%
+  group_by (Pop, Elev_m) %>% #group each replicate data by population and elevation
+  summarise(
+    n_reps = n(), #count number of replicates of each population
+    mean_proportion = mean (proportion, na.rm = TRUE), #calculate mean proportion viable across replicates
+    SE = sd(proportion, na.rm = TRUE)/sqrt(n()), #calculate SE of mean viability
+    .groups = "drop"
+  ) %>%
+  arrange (Elev_m) %>% #order populations by ascending elevation
+  mutate (Pop = factor (Pop, levels = Pop)) #keep population order based on the elevation
+print(pop_sum_1)
+
+lm_1 <- lm( #fit a linear regression model
+  proportion ~ Elev_m, #test whether proportion of viable changed by elevation
+  data = rep_sum_1
+)
+print(summary(lm_1))
+
+glm_1 <- glm( #fit a binomial generalized linear model
+  cbind(events, trails - events) ~ Elev_m, #model viable and non-viable seeds count as a function of elevation
+  family= binomial, #use binomial distribution
+  data = rep_sum_1
+)
+print(summary(glm_1))
+
+prediction_1 <- data.frame( #create a prediction dataset for further figure trendline creation
+  Elev_m = seq( #create a sequence of elevation values, start with lowest elevation and end at the highest elevation
+    min(rep_sum_1$Elev_m),
+    max(rep_sum_1$Elev_m),
+    length.out = 100
+  )
+)
+prediction_1$predicted <- predict( #calculate predicted viability for each elevation
+  glm_1, #use fitted binomial glm
+  newdata = prediction_1, #use predicted new elevation data
+  type = "response" #return predicted viability data
+)
+
+figure_1 <- ggplot(pop_sum_1, aes (x = Elev_m, y = mean_proportion)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
+  geom_point(size = 3) + #each populations' mean proportion of viable
+  geom_errorbar( #add SE bar
+    aes(
+      ymin= mean_proportion - SE,
+      ymax = mean_proportion + SE
+    ),
+    width = 40
+  ) +
+  geom_line( #add binomial glm trendline by using new prediction data
+    data = prediction_1,
+    aes(x = Elev_m, y = predicted), #plot predicted viability across elevation
+    linewidth = 1, color = "red"
+  ) +
+  geom_text( #add populations label at each points
+    aes(label = Pop),
+    vjust = 5,
+    size = 3
+  ) +
+  scale_x_continuous ( #control the x-axis scales
+    #still needs to figure out how to arrange the x-axis to separate the populations have close elevation, for now most of populations have close elevation level are stuck together
+    breaks = seq(250, 2500, by = 200),
+    limits = c(350, 2600)
+  ) +
+  scale_y_continuous( #limit the y-axis proportion of viable be in range from 0-1
+    limits = c(0, 1)
+  ) +
+  theme_classic() + #use classic ggplot theme
+  labs ( #add labels for x-axis and y-axis
+    x = "Elevation (m)",
+    y = "Proportion Viable"
+  )
+print(figure_1)
+```
+
