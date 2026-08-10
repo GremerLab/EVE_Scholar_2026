@@ -1,0 +1,67 @@
+---
+title: "Check_purple_stain"
+output: html_document
+date: "2026-08-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Libraries 
+```{r}
+library(tidyverse)
+
+sem <- function(x, na.rm=FALSE) {           #for calculating standard error
+  sd(x,na.rm=na.rm)/sqrt(length(na.omit(x)))
+} 
+```
+
+```{r}
+Control <- read_csv("../input/Y1_Control_lab_stored_seed_viability_data.csv")
+
+CP2 <- read_csv("../input/CP2_Y1_viability_data.csv") %>%
+  filter(!(Pop == "WL1" & Rep == 14))
+
+```
+Summarize CP2 to rep level
+```{r}
+CP2_rep <- CP2 %>%
+  group_by(Pop,Rep) %>%
+  summarise(num_seeds = n(),
+            num_purple = sum(is.na(Purple_Stainning)),
+            prop_purple = mean(Purple_Stainning, na.rm=TRUE)) %>%
+  ungroup()
+```
+```{r}
+CP2_purple <- glm(cbind(num_purple, num_seeds-num_purple) ~ Pop,
+                  data = CP2_rep,
+                  family=binomial)
+summary(CP2_purple)
+```
+```{r}
+CP2_summary <- CP2_rep %>%
+  group_by(Pop) %>%
+  summarise(mean_Purple = mean(prop_purple),
+            sem_Purple = sem(prop_purple))
+
+ggplot(CP2_summary, aes(x=Pop, y=mean_Purple)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_Purple - sem_Purple,
+                ymax = mean_Purple + sem_Purple)) +
+  theme_classic()
+```
+
+```{r}
+Control_summary <- Control %>%
+  group_by(Pop) %>%
+  summarise(mean_Purple = mean(Purple_staining),
+            sem_Purple = sem(Purple_staining))
+
+ggplot(Control_summary, aes(x=Pop, y=mean_Purple)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_Purple - sem_Purple,
+                ymax = mean_Purple + sem_Purple)) +
+  theme_classic()
+```
+
