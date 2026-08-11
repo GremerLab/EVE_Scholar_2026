@@ -1,0 +1,13 @@
+Pop,Elev_m,Elev_class,Latitude,Longitude,Num_mf,Seeds_per_bag,Reps,Total_seeds,Seeds_per_mf,Notes,,
+TM2,379,low,39.59255,-121.55072,45,10,30,300,6.666666667,"use 7 seeds from 30 mf, otherwise 6",done,done
+SC,422,low,38.41167,-120.73583,19,10,30,300,15.78947368,"use 16 seeds from 15 mf, otherwise 15 ",done,done
+IH,454,low,39.09332,-120.92114,30,10,30,300,10,,done,
+BH,511,low,37.40985,-119.96458,20,10,30,300,15,,done,done
+DPR,1019,mid,39.22846,-120.81518,20,10,30,300,15,,done,done
+WL1,1614,mid,38.78608,-120.2143,30,10,30,300,10,,done,done
+WL2,2020,high,38.8263,-120.25242,27,10,30,300,11.11111111,"use 12 seeds from 3 mf, otherwise 11",done,done
+WL3,2138,high,38.83528,-120.23824,20,10,30,300,15,,done,done
+YOSE1,2141,high,37.66374,-119.62484,24,9,30,270,12.5,"use 13 seeds from 12 mf, otherwise 12",done,
+SQ3,2373,high,36.72109,-118.84933,10,4,20,80,10,,done,
+LV2,2500,high,40.46563,-121.51487,8,8,30,240,30,,done,
+CP2,2244,high,38.66169,-120.13065,,,,,,,,
