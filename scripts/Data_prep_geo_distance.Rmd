@@ -39,6 +39,6 @@ coordinate
 ```{r}
 coordinate <- coordinate %>%
   select(c("Pop", "Elev_m", "Elev_class", "distance_km"))
-write_csv(coordinate, "../output/CP2_Y1_sites_w_distance_km.csv")
+#write_csv(coordinate, "../output/CP2_Y1_sites_w_distance_km.csv")
 ```
 
