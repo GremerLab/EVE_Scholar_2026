@@ -1,0 +1,103 @@
+---
+title: "CP2_vs_Control_viability"
+output: html_document
+date: "2026-08-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+```
+
+```{r}
+CP2_Y1 <- read.csv("../output/CP2_Y1_w_elev.csv") %>%
+  filter(!(Pop == "WL1" & Rep == 14)) #filter WL1 rep14, because there is no seeds in WL1 rep14 but we have marked it in the spreadsheet; without filter, the NA will be include in the SE and cause all the reps of WL1 become NA
+Control_Y1 <- read.csv("../output/Control_Y1_w_elev.csv")
+```
+
+```{r}
+control_1 <- Control_Y1 %>%
+  mutate (
+    viable = Updated_viability_cat == 1, #set only consider category 1 as viable
+    Treatment = "Control"
+    )
+
+CP2_Y1 <- CP2_Y1 %>%
+  mutate(
+    viable = Updated_viability_cat == 1,
+    Treatment = "CP2_Y1"
+  )
+
+compare_1 <- bind_rows (control_1, CP2_Y1)
+```
+
+```{r}
+compare_sum_1 <- compare_1 %>%
+  group_by (Pop, Elev_m, Treatment) %>% #group seeds data by population, elevation and replicates
+  summarise (
+    trials = n(),
+    events = sum (viable, na.rm = TRUE), #count how many seeds are considered as viable (category 1)
+    proportion = events/trials, 
+    SE = sd(viable, na.rm = TRUE)/sqrt(n()),
+    .groups = "drop"
+  )
+print(compare_sum_1)
+```
+
+```{r}
+compare_glm_1 <- glm( #fit a binomial generalized linear model
+  viable ~ Treatment, #overall change between control and CP2
+  family = binomial, 
+  data = compare_1
+)
+print(summary(compare_glm_1)) 
+```
+###Seeds buried at the common garden had significantly higher viability than laboratory-stored control seeds after one year (binomial GLM, P < 0.001).
+
+```{r}
+compare_glm_2 <- glm( #fit a binomial generalized linear model
+  viable ~ Treatment * Pop, #test whether effect of burial differ among populations
+  family = binomial, 
+  data = compare_1
+)
+print(summary(compare_glm_2)) 
+```
+###Different source populations shows different viability following one year of burial at the common garden in both CP2 and control group
+
+
+```{r}
+anova(compare_glm_2, test = "Chisq")
+```
+###Overall seed viability differed significantly between laboratory-stored control seeds and seeds buried at CP2 for one year (binomial GLM, χ² = 38.95, P < 0.001).
+
+###Seed viability differed significantly among source populations (χ² = 91.47, P < 0.001).
+
+###The Treatment × Population interaction was not statistically significant (χ² = 16.70, P = 0.081), the overall effect of burial was generally consistent across populations.
+
+```{r}
+compare_figure_1 <- ggplot(compare_sum_1, aes (x = reorder(Pop, Elev_m), y = proportion, color = Treatment, group = Treatment)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
+  geom_point(position = position_dodge(width = 0.4), size = 3) + #each populations' mean proportion of viable
+  geom_errorbar( #add SE bar
+    aes(
+      ymin= proportion - SE,
+      ymax = proportion + SE
+    ),
+    width = 0.2, position = position_dodge(width = 0.4)
+  ) +
+  geom_line(
+    position = position_dodge(width = 0.4), linewidth = 0.8
+  )+
+  theme_classic() + #use classic ggplot theme
+  labs ( #add labels for x-axis and y-axis
+    x = "Population (ordered by ascending elevation in meter)",
+    y = "Proportion Viable",
+    color = "Treatment"
+  )
+print(compare_figure_1)
+```
+
+
