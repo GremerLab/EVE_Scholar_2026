@@ -64,4 +64,3 @@ ggplot(Control_summary, aes(x=Pop, y=mean_Purple)) +
                 ymax = mean_Purple + sem_Purple)) +
   theme_classic()
 ```
-
