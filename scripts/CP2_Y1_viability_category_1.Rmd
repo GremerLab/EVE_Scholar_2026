@@ -1,0 +1,304 @@
+---
+title: "CP2_Y1_viability_category_1"
+output:
+  pdf_document: default
+  html_document: default
+date: "2026-08-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) 
+```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+#library(ggbreak) 
+```
+
+
+```{r}
+CP2_Y1 <- read.csv("../output/CP2_Y1_w_elev.csv") %>%
+  filter(!(Pop == "WL1" & Rep == 14)) #filter WL1 rep14, because there is no seeds in WL1 rep14 but we have marked it in the spreadsheet; without filter, the NA will be include in the SE and cause all the reps of WL1 become NA
+```
+
+
+```{r}
+rep_sum_1 <- CP2_Y1 %>%
+  group_by (Pop, Elev_m, Rep) %>% #group seeds data by population, elevation and replicates
+  summarise (
+    trials = sum (!is.na(Updated_viability_cat)), #count how many seeds we have tested in each replicate and remove the cell with NA data in the Updated_viability_cat (some rows are empty seed coat or like WL1 rep14 is an empty envelope)
+    events = sum (Updated_viability_cat == 1, na.rm = TRUE), #count how many seeds are considered as viable (category 1)
+    .groups = "drop"
+  ) %>%
+  mutate (proportion = events/trials) #calculate viable proportion of each replicate
+
+pop_sum_1 <- rep_sum_1 %>%
+  group_by (Pop, Elev_m) %>% #group each replicate data by population and elevation
+  summarise(
+    n_reps = n(), #count number of replicates of each population
+    mean_proportion = mean (proportion, na.rm = TRUE), #calculate mean proportion viable across replicates
+    SE = sd(proportion, na.rm = TRUE)/sqrt(n()), #calculate SE of mean viability
+    .groups = "drop"
+  )
+print(pop_sum_1)
+```
+
+
+
+```{r}
+glm_1 <- glm( #fit a binomial generalized linear model
+  cbind(events, trials - events) ~ Elev_m, #model viable and non-viable seeds count as a function of population
+  family= binomial, #use binomial distribution
+  data = rep_sum_1
+)
+anova(glm_1, test = "Chisq")
+
+prediction_1 <- data.frame( #create a prediction dataset containing one row for each population
+  Elev_m = seq(
+    min(rep_sum_1$Elev_m),
+    max(rep_sum_1$Elev_m),
+    length.out = 100
+  )
+)
+prediction_1$predicted <- predict( #calculate predicted viability for each elevation
+  glm_1, #use fitted binomial glm
+  newdata = prediction_1, #use predicted new elevation data
+  type = "response" #return predicted viability data
+)
+
+print(summary(glm_1))
+```
+
+```{r}
+figure_1 <- ggplot(pop_sum_1, aes (x = Elev_m, y = mean_proportion, color = Pop)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
+  geom_point(size = 3) + #each populations' mean proportion of viable
+  geom_errorbar( #add SE bar
+    aes(
+      ymin= mean_proportion - SE,
+      ymax = mean_proportion + SE, color = Pop
+    ),
+    width = 50
+  ) +
+  #scale_x_break(c(600, 1000)) +
+  #scale_x_break(c(1100, 1600)) +
+  #scale_x_break(c(1700, 2000)) +
+  geom_text (aes (label = Pop), vjust = -5, size = 3, show.legend = FALSE) + #label each point with its population name
+  geom_line( #add binomial glm trendline by using new prediction data
+    data = prediction_1,
+    aes(x = Elev_m, y = predicted, group = 1), #plot predicted viability across elevation
+    linewidth = 1, color = "red"
+  ) +
+  scale_x_continuous(limits = c(350, 2550), n.break = 15) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme_classic() + #use classic ggplot theme
+  theme(text=element_text(size=10), axis.text.x = element_text(angle = 45,  hjust = 1)) +
+  labs ( #add labels for x-axis and y-axis
+    x = "Population (ordered by ascending elevation in meter)",
+    y = "Proportion Viable"
+  ) 
+print(figure_1)
+```
+
+
+to do:
+geomjitter can fix the population stack together
+
+```{r}
+distance <- read.csv("../output/CP2_Y1_sites_w_distance_elev_diff.csv")
+```
+
+```{r}
+pop_sum_1 <- pop_sum_1 %>%
+  left_join (distance %>% select (distance_km, Pop), by = "Pop") #join distance with population level data
+
+rep_sum_1 <- rep_sum_1 %>%
+  left_join(distance %>% select (distance_km, Pop), by = "Pop") #join distance with replicate level data
+```
+
+```{r}
+glm_distance <- glm( #fit a binomial generalized linear model
+  cbind(events, trials - events) ~ distance_km, #model viable and non-viable seeds count as a function of distance
+  family = binomial, #use binomial distribution
+  data = rep_sum_1 #use replicate level data (because the data has events and trials but the population level data does not)
+)
+
+prediction_distance <- data.frame( #create a prediction dataset for geographic distance
+  distance_km = seq(
+    min(rep_sum_1$distance_km), #start from the shortest to longest geographic distance
+    max(rep_sum_1$distance_km),
+    length.out = 100 #generate 100 equally spaced distance values
+  )
+)
+
+prediction_distance$predicted <- predict( #calculate predicted viability across geographic distance
+  glm_distance, #use the fitted binomial glm
+  newdata = prediction_distance, #predict viability for the new distance values
+  type = "response" #return predicted proportions
+)
+
+print(summary(glm_distance))
+```
+###Geographic distance from the common garden significantly affected seed viability after one year of burial (binomial GLM, P < 0.001).
+
+```{r}
+anova(glm_distance, test = "Chisq")
+```
+###Geographic distance from the common garden significantly affected seed viability following one year of burial (Analysis of Deviance, χ² = 14.13, df = 1, P < 0.001).
+
+```{r}
+figuer_distance <- ggplot ( #create a plot of population mean viability against geographic distance
+  pop_sum_1, aes (x = distance_km, y = mean_proportion)
+) + 
+  geom_point(size = 2.5) + #plot the mean proportion of viable seeds for each population
+  geom_errorbar( #add SE bar
+    aes(
+      ymin= mean_proportion - SE,
+      ymax = mean_proportion + SE
+    ),
+    width = 5
+  ) +
+  geom_text (aes (label = Pop), vjust = -6.1, size = 3) + #label each point with its population name
+  geom_line(
+  data = prediction_distance,
+  aes(
+    x = distance_km,
+    y = predicted
+  ),
+  linewidth = 1,
+  color = "red" #add the fitted binomial glm prediction line
+) +
+  scale_x_continuous(n.breaks = 10) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme(text=element_text(size=10), axis.text.x = element_text(angle = 45,  hjust = 1)) +
+  theme_classic() + #use classic ggplot theme
+  labs ( #add labels for x-axis and y-axis
+    x = "Geographic Distance from CP2 (km)",
+    y = "Proportion Viable"
+  )
+print(figuer_distance)
+```
+
+```{r}
+climate_distance <- read.csv("../output/CP2_Climate_Distance.csv")
+```
+
+```{r}
+gowers_recent <- climate_distance %>%
+  filter(timeframe == "Recent")
+
+gowers_historic <- climate_distance %>%
+  filter(timeframe == "Historic")
+```
+
+```{r}
+rep_sum_recent <- rep_sum_1 %>%
+  left_join(
+    gowers_recent %>%
+      select(pop, Gowers_Dist),
+    by = c("Pop" = "pop")
+  )
+
+rep_sum_historic <- rep_sum_1 %>%
+  left_join(
+    gowers_historic %>%
+      select(pop, Gowers_Dist),
+    by = c("Pop" = "pop")
+  )
+```
+
+```{r}
+glm_climate_recent <- glm( #fit a binomial generalized linear model
+  cbind(events, trials - events) ~ Gowers_Dist, #model viable and non-viable seeds count as a function of distance
+  family = binomial, #use binomial distribution
+  data = rep_sum_recent #use replicate level data (because the data has events and trials but the population level data does not)
+)
+
+glm_climate_historic <- glm(
+  cbind(events, trials - events) ~ Gowers_Dist,
+  family = binomial,
+  data = rep_sum_historic
+)
+
+print(summary(glm_climate_recent))
+print(summary(glm_climate_historic))
+```
+
+```{r}
+anova(glm_climate_recent, test = "Chisq")
+anova(glm_climate_historic, test = "Chisq")
+```
+
+```{r}
+prediction_climate_recent <- data.frame( #create a prediction dataset for geographic distance
+  Gowers_Dist = seq(
+    min(rep_sum_recent$Gowers_Dist), #start from the shortest to longest geographic distance
+    max(rep_sum_recent$Gowers_Dist),
+    length.out = 100 #generate 100 equally spaced distance values
+  )
+)
+prediction_climate_recent$predicted <- predict( #calculate predicted viability across geographic distance
+  glm_climate_recent, #use the fitted binomial glm
+  newdata = prediction_climate_recent, #predict viability for the new distance values
+  type = "response" #return predicted proportions
+)
+
+prediction_climate_historic <- data.frame( #create a prediction dataset for geographic distance
+  Gowers_Dist = seq(
+    min(rep_sum_historic$Gowers_Dist), #start from the shortest to longest geographic distance
+    max(rep_sum_historic$Gowers_Dist),
+    length.out = 100 #generate 100 equally spaced distance values
+  )
+)
+prediction_climate_historic$predicted <- predict( #calculate predicted viability across geographic distance
+  glm_climate_historic, #use the fitted binomial glm
+  newdata = prediction_climate_historic, #predict viability for the new distance values
+  type = "response" #return predicted proportions
+)
+```
+
+```{r}
+pop_recent <- rep_sum_recent %>%
+  group_by(Pop, Gowers_Dist) %>%
+  summarise(
+    mean_proportion = mean(proportion),
+    SE = sd(proportion)/sqrt(n()),
+    .groups = "drop"
+  )
+
+pop_historic <- rep_sum_historic %>%
+  group_by(Pop, Gowers_Dist) %>%
+  summarise(
+    mean_proportion = mean(proportion),
+    SE = sd(proportion)/sqrt(n()),
+    .groups = "drop"
+  )
+```
+
+```{r}
+ggplot(pop_recent, aes(x = Gowers_Dist, y = mean_proportion)) +
+  geom_point(size = 2) +
+  geom_errorbar(
+    aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
+  geom_text(aes(label = Pop, vjust = -6), size = 3) +
+  geom_line(data = prediction_climate_recent, aes(x = Gowers_Dist, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+  scale_x_continuous(n.breaks = 7) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme_classic() +
+  labs(x = "Gower Climate Distance from CP2 (1995-2025)", y = "Proportion Viable")
+```
+
+```{r}
+ggplot(pop_historic, aes (x = Gowers_Dist, y = mean_proportion)) +
+  geom_point(size = 2) +
+  geom_errorbar(
+    aes(ymin = mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
+  geom_text(aes(label = Pop, vjust = -5.8), size = 3) +
+  geom_line(data = prediction_climate_historic, aes(x = Gowers_Dist, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+  scale_x_continuous(n.breaks = 7) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme_classic() +
+  labs(x = "Gower Climate Distance from CP2 (1965-1994)", y = "Proportion Viable")
+```
+
