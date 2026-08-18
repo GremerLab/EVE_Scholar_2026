@@ -226,6 +226,122 @@ print(figuer_distance)
 ```
 
 ```{r}
+climate_distance <- read.csv("../output/CP2_Climate_Distance.csv")
+```
 
+```{r}
+gowers_recent <- climate_distance %>%
+  filter(timeframe == "Recent")
+
+gowers_historic <- climate_distance %>%
+  filter(timeframe == "Historic")
+```
+
+```{r}
+rep_sum_recent <- rep_sum_1 %>%
+  left_join(
+    gowers_recent %>%
+      select(pop, Gowers_Dist),
+    by = c("Pop" = "pop")
+  )
+
+rep_sum_historic <- rep_sum_1 %>%
+  left_join(
+    gowers_historic %>%
+      select(pop, Gowers_Dist),
+    by = c("Pop" = "pop")
+  )
+```
+
+```{r}
+glm_climate_recent <- glm( #fit a binomial generalized linear model
+  cbind(events, trials - events) ~ Gowers_Dist, #model viable and non-viable seeds count as a function of distance
+  family = binomial, #use binomial distribution
+  data = rep_sum_recent #use replicate level data (because the data has events and trials but the population level data does not)
+)
+
+glm_climate_historic <- glm(
+  cbind(events, trials - events) ~ Gowers_Dist,
+  family = binomial,
+  data = rep_sum_historic
+)
+
+print(summary(glm_climate_recent))
+print(summary(glm_climate_historic))
+```
+
+```{r}
+anova(glm_climate_recent, test = "Chisq")
+anova(glm_climate_historic, test = "Chisq")
+```
+
+```{r}
+prediction_climate_recent <- data.frame( #create a prediction dataset for geographic distance
+  Gowers_Dist = seq(
+    min(rep_sum_recent$Gowers_Dist), #start from the shortest to longest geographic distance
+    max(rep_sum_recent$Gowers_Dist),
+    length.out = 100 #generate 100 equally spaced distance values
+  )
+)
+prediction_climate_recent$predicted <- predict( #calculate predicted viability across geographic distance
+  glm_climate_recent, #use the fitted binomial glm
+  newdata = prediction_climate_recent, #predict viability for the new distance values
+  type = "response" #return predicted proportions
+)
+
+prediction_climate_historic <- data.frame( #create a prediction dataset for geographic distance
+  Gowers_Dist = seq(
+    min(rep_sum_historic$Gowers_Dist), #start from the shortest to longest geographic distance
+    max(rep_sum_historic$Gowers_Dist),
+    length.out = 100 #generate 100 equally spaced distance values
+  )
+)
+prediction_climate_historic$predicted <- predict( #calculate predicted viability across geographic distance
+  glm_climate_historic, #use the fitted binomial glm
+  newdata = prediction_climate_historic, #predict viability for the new distance values
+  type = "response" #return predicted proportions
+)
+```
+
+```{r}
+pop_recent <- rep_sum_recent %>%
+  group_by(Pop, Gowers_Dist) %>%
+  summarise(
+    mean_proportion = mean(proportion),
+    SE = sd(proportion)/sqrt(n()),
+    .groups = "drop"
+  )
+
+pop_historic <- rep_sum_historic %>%
+  group_by(Pop, Gowers_Dist) %>%
+  summarise(
+    mean_proportion = mean(proportion),
+    SE = sd(proportion)/sqrt(n()),
+    .groups = "drop"
+  )
+```
+
+```{r}
+ggplot(pop_recent, aes(x = Gowers_Dist, y = mean_proportion)) +
+  geom_point(size = 2) +
+  geom_errorbar(
+    aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
+  geom_text(aes(label = Pop, vjust = -6), size = 3) +
+  geom_line(data = prediction_climate_recent, aes(x = Gowers_Dist, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme_classic() +
+  labs(x = "Gower Climate Distance from CP2 (1995-2025)", y = "Proportion Viable")
+```
+
+```{r}
+ggplot(pop_historic, aes (x = Gowers_Dist, y = mean_proportion)) +
+  geom_point(size = 2) +
+  geom_errorbar(
+    aes(ymin = mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
+  geom_text(aes(label = Pop, vjust = -5.8), size = 3) +
+  geom_line(data = prediction_climate_historic, aes(x = Gowers_Dist, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme_classic() +
+  labs(x = "Gower Climate Distance from CP2 (1965-1994)", y = "Proportion Viable")
 ```
 
