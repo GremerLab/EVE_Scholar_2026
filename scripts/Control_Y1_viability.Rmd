@@ -18,6 +18,8 @@ library(tidyverse)
 Control_Y1 <- read.csv("../output/Control_Y1_w_elev.csv")
 ```
 
+
+#Category 1 as viable
 ```{r}
 control_1 <- Control_Y1 %>%
   mutate (
@@ -39,9 +41,9 @@ print(control_sum_1)
 
 ```{r}
 control_glm_1 <- glm( #fit a binomial generalized linear model
-  viable ~ Pop, #model the probability that an individual seed is viable as a function of population
+  cbind(events, trials - events) ~ Elev_m, #model the probability that an individual seed is viable as a function of population
   family = binomial, 
-  data = control_1
+  data = control_sum_1
 )
 print(summary(control_glm_1)) #can also run a population rather than population
 ```
@@ -53,39 +55,192 @@ anova(control_glm_1, test = "Chisq")
 ###Seed viability differed significantly among source populations under laboratory storage (Analysis of Deviance, χ² = 41.55, df = 10, P < 0.001).
 
 ```{r}
-control_prediction_1 <- control_sum_1 %>%
-  select (Pop)
+control_prediction_1 <- data.frame(
+  Elev_m = seq(
+    min(control_sum_1$Elev_m),
+    max(control_sum_1$Elev_m),
+    length.out = 100
+  )
+)
 control_prediction_1$predicted <- predict( #calculate predicted viability for each population
   control_glm_1, #use fitted binomial glm
   newdata = control_prediction_1, #use predicted new population data
   type = "response" #return predicted viability data
 )
-print(control_prediction_1)
 ```
 
 
 ```{r}
 control_figure_1 <- ggplot( #create a ggplot use population level summary data with x-axis in population ordered by ascending elevation in meter and y-axis by mean proportion of viable
-  control_sum_1, aes (x = reorder(Pop, Elev_m), y = proportion) 
+  control_sum_1, aes (x = Elev_m, y = proportion, color = Pop) 
 ) +
-  geom_point(size = 3) + #each populations' mean proportion of viable
+  geom_point(size = 2) + #each populations' mean proportion of viable
    geom_errorbar( #add SE bar
     aes(
       ymin= proportion - SE,
       ymax = proportion + SE
     ),
-    width = 0.2
+    width = 50
   ) +
+  geom_text (aes (label = Pop), vjust = -5.5, size = 3, show.legend = FALSE) +
    geom_line( #add binomial glm trendline by using new prediction data
     data = control_prediction_1,
-    aes(x = Pop, y = predicted, group = 1), #plot predicted viability across population
+    aes(x = Elev_m, y = predicted, group = 1), #plot predicted viability across population
     linewidth = 1, color = "red"
   ) +
+  scale_x_continuous(limits = c(350, 2550), n.break = 15) +
   theme_classic () + #use classic ggplot theme
   labs ( #add labels for x-axis and y-axis
-    x = "Population (ordered by ascending elevation in meter)",
+    x = "Elevation (m)",
     y = "Proportion Viable"
   )
 print (control_figure_1)
 ```
 
+
+#Category 1 + 2 as viable
+```{r}
+control_12 <- Control_Y1 %>%
+  mutate (
+    viable = Updated_viability_cat %in% c(1, 2) #set only consider category 1 as viable
+    )
+
+control_sum_12 <- control_12 %>%
+  group_by (Pop, Elev_m) %>%
+  summarise (
+    trials = n(), #count total number of tested seeds
+    events = sum(viable), #count the number of viable seeds
+    proportion = events / trials, #calculate the proportion of viable
+    SE = sd(viable) / sqrt(n()), #calculate SE
+    .groups = "drop"
+  )
+print(control_sum_12)
+```
+
+```{r}
+control_glm_12 <- glm( #fit a binomial generalized linear model
+  cbind(events, trials - events) ~ Elev_m, #model the probability that an individual seed is viable as a function of population
+  family = binomial, 
+  data = control_sum_12
+)
+print(summary(control_glm_12)) #can also run a population rather than population
+anova(control_glm_12, test = "Chisq")
+```
+
+```{r}
+control_prediction_12 <- data.frame(
+  Elev_m = seq(
+    min(control_sum_12$Elev_m),
+    max(control_sum_12$Elev_m),
+    length.out = 100
+  )
+)
+control_prediction_12$predicted <- predict( #calculate predicted viability for each population
+  control_glm_12, #use fitted binomial glm
+  newdata = control_prediction_12, #use predicted new population data
+  type = "response" #return predicted viability data
+)
+```
+
+
+```{r}
+control_figure_12 <- ggplot( #create a ggplot use population level summary data with x-axis in population ordered by ascending elevation in meter and y-axis by mean proportion of viable
+  control_sum_12, aes (x = Elev_m, y = proportion, color = Pop) 
+) +
+  geom_point(size = 2) + #each populations' mean proportion of viable
+   geom_errorbar( #add SE bar
+    aes(
+      ymin= proportion - SE,
+      ymax = proportion + SE
+    ),
+    width = 50
+  ) +
+  geom_text (aes (label = Pop), vjust = -5, size = 3, show.legend = FALSE) +
+   geom_line( #add binomial glm trendline by using new prediction data
+    data = control_prediction_12,
+    aes(x = Elev_m, y = predicted, group = 1), #plot predicted viability across population
+    linewidth = 1, color = "red"
+  ) +
+  scale_x_continuous(limits = c(350, 2550), n.break = 15) +
+  scale_y_continuous(limits = c(0, 1.12)) +
+  theme_classic () + #use classic ggplot theme
+  labs ( #add labels for x-axis and y-axis
+    x = "Elevation (m)",
+    y = "Proportion Viable"
+  )
+print (control_figure_12)
+```
+
+
+#Category 1 + 2 + 3 as viable
+```{r}
+control_123 <- Control_Y1 %>%
+  mutate (
+    viable = Updated_viability_cat %in% c(1, 2, 3) #set only consider category 1 as viable
+    )
+
+control_sum_123 <- control_123 %>%
+  group_by (Pop, Elev_m) %>%
+  summarise (
+    trials = n(), #count total number of tested seeds
+    events = sum(viable), #count the number of viable seeds
+    proportion = events / trials, #calculate the proportion of viable
+    SE = sd(viable) / sqrt(n()), #calculate SE
+    .groups = "drop"
+  )
+print(control_sum_123)
+```
+
+```{r}
+control_glm_123 <- glm( #fit a binomial generalized linear model
+  cbind(events, trials - events) ~ Elev_m, #model the probability that an individual seed is viable as a function of population
+  family = binomial, 
+  data = control_sum_123
+)
+print(summary(control_glm_123)) #can also run a population rather than population
+anova(control_glm_123, test = "Chisq")
+```
+
+```{r}
+control_prediction_123 <- data.frame(
+  Elev_m = seq(
+    min(control_sum_123$Elev_m),
+    max(control_sum_123$Elev_m),
+    length.out = 100
+  )
+)
+control_prediction_123$predicted <- predict( #calculate predicted viability for each population
+  control_glm_123, #use fitted binomial glm
+  newdata = control_prediction_123, #use predicted new population data
+  type = "response" #return predicted viability data
+)
+```
+
+
+```{r}
+control_figure_123 <- ggplot( #create a ggplot use population level summary data with x-axis in population ordered by ascending elevation in meter and y-axis by mean proportion of viable
+  control_sum_123, aes (x = Elev_m, y = proportion, color = Pop) 
+) +
+  geom_point(size = 2) + #each populations' mean proportion of viable
+   geom_errorbar( #add SE bar
+    aes(
+      ymin= proportion - SE,
+      ymax = proportion + SE
+    ),
+    width = 50
+  ) +
+  geom_text (aes (label = Pop), vjust = -5, size = 3, show.legend = FALSE) +
+   geom_line( #add binomial glm trendline by using new prediction data
+    data = control_prediction_123,
+    aes(x = Elev_m, y = predicted, group = 1), #plot predicted viability across population
+    linewidth = 1, color = "red"
+  ) +
+  scale_x_continuous(limits = c(350, 2550), n.break = 15) +
+  scale_y_continuous(limits = c(0.3, 1.2)) +
+  theme_classic () + #use classic ggplot theme
+  labs ( #add labels for x-axis and y-axis
+    x = "Elevation (m)",
+    y = "Proportion Viable"
+  )
+print (control_figure_123)
+```
