@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 library(ggplot2)
+#library(ggbreak) 
 ```
 
 
@@ -45,22 +46,41 @@ print(pop_sum_1)
 ```
 
 
+
 ```{r}
+glm_1 <- glm( #fit a binomial generalized linear model
+  cbind(events, trials - events) ~ Elev_m, #model viable and non-viable seeds count as a function of population
+  family= binomial, #use binomial distribution
+  data = rep_sum_1
+)
+anova(glm_1, test = "Chisq")
+
+prediction_1 <- data.frame( #create a prediction dataset containing one row for each population
+  Elev_m = seq(
+    min(rep_sum_1$Elev_m),
+    max(rep_sum_1$Elev_m),
+    length.out = 100
+  )
+)
+prediction_1$predicted <- predict( #calculate predicted viability for each elevation
+  glm_1, #use fitted binomial glm
+  newdata = prediction_1, #use predicted new elevation data
+  type = "response" #return predicted viability data
+)
+
+print(summary(glm_1))
+```
+###Different source populations shows different viability following one year of burial at the common garden
+###Seed viability differed significantly among source populations following one year of burial at the common garden (Analysis of Deviance, χ² = 66.62, df = 10, P < 0.001).
+
+
 glm_1 <- glm( #fit a binomial generalized linear model
   cbind(events, trials - events) ~ Pop, #model viable and non-viable seeds count as a function of population
   family= binomial, #use binomial distribution
   data = rep_sum_1
 )
-print(summary(glm_1))
-```
-###Different source populations shows different viability following one year of burial at the common garden
-
-```{r}
 anova(glm_1, test = "Chisq")
-```
-###Seed viability differed significantly among source populations following one year of burial at the common garden (Analysis of Deviance, χ² = 66.62, df = 10, P < 0.001).
 
-```{r}
 prediction_1 <- pop_sum_1 %>% #create a prediction dataset containing one row for each population
   select(Pop)
 prediction_1$predicted <- predict( #calculate predicted viability for each elevation
@@ -68,11 +88,13 @@ prediction_1$predicted <- predict( #calculate predicted viability for each eleva
   newdata = prediction_1, #use predicted new elevation data
   type = "response" #return predicted viability data
 )
+
+print(summary(glm_1))
 print(prediction_1)
-```
 
 
-```{r}
+
+
 figure_1 <- ggplot(pop_sum_1, aes (x = reorder(Pop, Elev_m), y = mean_proportion)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
   geom_point(size = 3) + #each populations' mean proportion of viable
   geom_errorbar( #add SE bar
@@ -80,7 +102,7 @@ figure_1 <- ggplot(pop_sum_1, aes (x = reorder(Pop, Elev_m), y = mean_proportion
       ymin= mean_proportion - SE,
       ymax = mean_proportion + SE
     ),
-    width = 0.2
+    width = .3
   ) +
   geom_line( #add binomial glm trendline by using new prediction data
     data = prediction_1,
@@ -93,10 +115,40 @@ figure_1 <- ggplot(pop_sum_1, aes (x = reorder(Pop, Elev_m), y = mean_proportion
     y = "Proportion Viable"
   )
 print(figure_1)
+
+```{r}
+figure_1 <- ggplot(pop_sum_1, aes (x = Elev_m, y = mean_proportion, color = Pop)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
+  geom_point(size = 3) + #each populations' mean proportion of viable
+  geom_errorbar( #add SE bar
+    aes(
+      ymin= mean_proportion - SE,
+      ymax = mean_proportion + SE, color = Pop
+    ),
+    width = 50
+  ) +
+  #scale_x_break(c(600, 1000)) +
+  #scale_x_break(c(1100, 1600)) +
+  #scale_x_break(c(1700, 2000)) +
+  geom_text (aes (label = Pop), vjust = -5, size = 3, show.legend = FALSE) + #label each point with its population name
+  geom_line( #add binomial glm trendline by using new prediction data
+    data = prediction_1,
+    aes(x = Elev_m, y = predicted, group = 1), #plot predicted viability across elevation
+    linewidth = 1, color = "red"
+  ) +
+  scale_x_continuous(limits = c(350, 2550), n.break = 15) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme_classic() + #use classic ggplot theme
+  theme(text=element_text(size=10), axis.text.x = element_text(angle = 45,  hjust = 1)) +
+  labs ( #add labels for x-axis and y-axis
+    x = "Population (ordered by ascending elevation in meter)",
+    y = "Proportion Viable"
+  ) 
+print(figure_1)
 ```
+
+
 to do:
-population on the x-axis so population as the prediction varibale
-use the population to draw the trendline
+geomjitter can fix the population stack together
 
 ```{r}
 distance <- read.csv("../output/CP2_Y1_sites_w_distance_elev_diff.csv")
@@ -144,7 +196,7 @@ anova(glm_distance, test = "Chisq")
 figuer_distance <- ggplot ( #create a plot of population mean viability against geographic distance
   pop_sum_1, aes (x = distance_km, y = mean_proportion)
 ) + 
-  geom_point(size = 3) + #plot the mean proportion of viable seeds for each population
+  geom_point(size = 2.5) + #plot the mean proportion of viable seeds for each population
   geom_errorbar( #add SE bar
     aes(
       ymin= mean_proportion - SE,
@@ -152,7 +204,7 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
     ),
     width = 5
   ) +
-  geom_text (aes (label = Pop), vjust = -4.3) + #label each point with its population name
+  geom_text (aes (label = Pop), vjust = -6.1, size = 3) + #label each point with its population name
   geom_line(
   data = prediction_distance,
   aes(
@@ -162,6 +214,9 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
   linewidth = 1,
   color = "red" #add the fitted binomial glm prediction line
 ) +
+  scale_x_continuous(n.breaks = 10) +
+  scale_y_continuous(limits = c(.35, .85)) +
+  theme(text=element_text(size=10), axis.text.x = element_text(angle = 45,  hjust = 1)) +
   theme_classic() + #use classic ggplot theme
   labs ( #add labels for x-axis and y-axis
     x = "Geographic Distance from CP2 (km)",
@@ -169,3 +224,8 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
   )
 print(figuer_distance)
 ```
+
+```{r}
+
+```
+

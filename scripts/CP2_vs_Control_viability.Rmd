@@ -80,17 +80,16 @@ anova(compare_glm_2, test = "Chisq")
 
 ```{r}
 compare_figure_1 <- ggplot(compare_sum_1, aes (x = reorder(Pop, Elev_m), y = proportion, color = Treatment, group = Treatment)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
-  geom_point(position = position_dodge(width = 0.4), size = 3) + #each populations' mean proportion of viable
+  geom_point(position = position_dodge(width = 0.5), size = 2) + #each populations' mean proportion of viable
   geom_errorbar( #add SE bar
     aes(
       ymin= proportion - SE,
       ymax = proportion + SE
     ),
-    width = 0.2, position = position_dodge(width = 0.4)
+    width = 0.4, position = position_dodge(width = 0.5)
   ) +
-  geom_line(
-    position = position_dodge(width = 0.4), linewidth = 0.8
-  )+
+  #coord_flip() +
+  #geom_line(position = position_dodge(width = 0.4), linewidth = 0.8)+
   theme_classic() + #use classic ggplot theme
   labs ( #add labels for x-axis and y-axis
     x = "Population (ordered by ascending elevation in meter)",
