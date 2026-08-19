@@ -288,7 +288,7 @@ ggplot(pop_historic, aes (x = Gowers_Dist, y = mean_proportion)) +
 ```
 
 
-#environmental variability by population
+#environmental variability by population (temperature + precipitation seasonality)
 ```{r}
 all_clim <- read.csv("../output/WtrYr_Clim_2025NoOct.csv")
 ```
@@ -297,7 +297,9 @@ all_clim <- read.csv("../output/WtrYr_Clim_2025NoOct.csv")
 recent_vari <- all_clim %>%
   filter(timeframe == "recent", year >= 1995, year <= 2025, Season == "Water Year", pop != "CP2_garden") %>%
   group_by (pop, Elev_class, Elev_m, Latitude, Longitude) %>%
-  summarise(across(cwd:ppt_coldest_month, ~sd(.x, na.rm = TRUE), .names = "{.col}_sd"), .groups = "drop")
+  summarise(temp_seasonality_sd = sd(temp_seasonality, na.rm = TRUE),
+            ppt_seasonality_sd = sd(ppt_seasonality, na.rm = TRUE),
+            .groups = "drop")
 recent_vari_scaled <- recent_vari %>%
   mutate(across(ends_with("_sd"), ~(.x - min(.x, na.rm = TRUE))/(max(.x, na.rm = TRUE) - min(.x, na.rm = TRUE)), .names = "{.col}_scaled"))
 recent_vari_scaled <- recent_vari_scaled %>%
@@ -317,7 +319,9 @@ recent_envi_vari <- recent_vari_scaled %>%
 historic_vari <- all_clim %>%
   filter(timeframe == "historic", year >= 1965, year <= 1994, Season == "Water Year", pop != "CP2_garden") %>%
   group_by (pop, Elev_class, Elev_m, Latitude, Longitude) %>%
-  summarise(across(cwd:ppt_coldest_month, ~sd(.x, na.rm = TRUE), .names = "{.col}_sd"), .groups = "drop")
+  summarise(temp_seasonality_sd = sd(temp_seasonality, na.rm = TRUE),
+            ppt_seasonality_sd = sd(ppt_seasonality, na.rm = TRUE),
+            .groups = "drop")
 historic_vari_scaled <- historic_vari %>%
   mutate(across(ends_with("_sd"), ~(.x - min(.x, na.rm = TRUE))/(max(.x, na.rm = TRUE) - min(.x, na.rm = TRUE)), .names = "{.col}_scaled"))
 historic_vari_scaled <- historic_vari_scaled %>%
@@ -346,12 +350,12 @@ envi_vari_figure<-all_envi_vari %>%
   facet_wrap(~timeframe) +
   theme_classic() +
   scale_y_continuous(expand = c(0, 0.01))+
-  labs(x = "Population", y = "Composite Environmental Variability", fill = "Elevation (m)") +
+  labs(x = "Population", y = "Environmental Variability", fill = "Elevation (m)") +
   theme(text = element_text (size = 18), axis.text.x = element_text(size = 9, angle = 45, hjust = 1))
 print(envi_vari_figure)
 ```
 
-#viability across environmental variability
+#viability across environmental variability (temperature + precipitation seasonality)
 ```{r}
 rep_sum_envi_recent <- rep_sum_123 %>%
   left_join(recent_envi_vari %>% select(pop, envi_vari), by = c("Pop" = "pop"))
@@ -413,15 +417,16 @@ pop_envi_historic <- pop_sum_123 %>%
 
 ```{r}
 figure_envi_recent <- ggplot(pop_envi_recent, aes (x = envi_vari, y = mean_proportion)) +
+  geom_line(data = prediction_envi_recent, aes(x = envi_vari, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
   geom_point(size = 2) +
   geom_errorbar(aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
-  geom_text(aes(label = Pop), vjust = -4.8) +
-  geom_line(data = prediction_envi_recent, aes(x = envi_vari, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+  geom_text(aes(label = Pop), vjust = -7.5, size = 2.5) +
+  
   scale_y_continuous(expand = c(0, 0.04)) +
   scale_x_continuous(n.breaks = 7) +
   theme_classic() +
   labs(
-    x = "Recent Composite Environmental Variability (1995-2025)",
+    x = "Recent Environmental Variability (1995-2025)",
     y = "Proportion Viable"
   )
 print(figure_envi_recent)
@@ -437,7 +442,7 @@ figure_envi_historic <- ggplot(pop_envi_historic, aes (x = envi_vari, y = mean_p
   scale_x_continuous(n.breaks = 7) +
   theme_classic() +
   labs(
-    x = "Historic Composite Environmental Variability (1965-1994)",
+    x = "Historic Environmental Variability (1965-1994)",
     y = "Proportion Viable"
   )
 print(figure_envi_historic)

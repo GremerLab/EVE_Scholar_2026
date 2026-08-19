@@ -34,17 +34,17 @@ all_clim <- read_csv("../output/WtrYr_Clim_2025NoOct.csv")
 cp2_recent_Garden <- all_clim %>% 
   filter(pop=="CP2_garden", timeframe == "recent", year >= 1995, year <= 2025, Season == "Water Year") %>% #filter CP2 garden and set the time for recent climate data (1995-2025)
   summarise(#summarise and remove NA value for both temp and ppt seasonality data 
-    temp_seasonality_Garden = mean(temp_seasonality, na.rm = TRUE),  
-    ppt_seasonality_Garden = mean(ppt_seasonality, na.rm = TRUE)
-  )
+    across(cwd:ppt_coldest_month, ~mean (.x, na.rm = TRUE))
+    ) %>%
+  rename_with(~paste0(.x, '_Garden'))
 
 #CP2 30 years average (historic)
 cp2_historic_Garden <- all_clim %>%
   filter (pop == "CP2_garden", timeframe == "historic", year >= 1965, year <= 1994, Season == "Water Year") %>%
   summarise (
-    temp_seasonality_Garden = mean (temp_seasonality, na.rm = TRUE),
-    ppt_seasonality_Garden = mean (ppt_seasonality, na.rm = TRUE)
-  )
+    across(cwd:ppt_coldest_month, ~mean(.x, na.rm = TRUE))
+  ) %>%
+  rename_with (~paste0(.x, '_Garden'))
 
 cp2_recent_range_prep <- cp2_recent_Garden %>%
   rename_with(~str_remove(.,"_Garden"), everything())
@@ -85,6 +85,12 @@ historic_wtryr_clim <- all_clim %>%
   filter(timeframe=="historic", year >= 1965, year<=1994,
          Season=="Water Year", pop != "CP2_garden")
 historic_wtryr_clim_nest <- historic_wtryr_clim %>% nest(.by=year) #nest to prepare for bootstrapping 
+
+#range prep
+cp2_recent_range_prep <- cp2_recent_Garden %>%
+  rename_with(~str_remove(.x, "_Garden"), everything())
+cp2_recent_range_prep <- cp2_historic_Garden %>%
+  rename_with(~str_remove(.x, "_Garden"), everything())
 ```
 
 ### Create the gower_calc function 
@@ -101,36 +107,62 @@ gowers_calc <- function(data, indices, P, garden_clim, garden_range) { #function
   
   data_means <- data %>% 
     group_by(pop, Elev_class, Elev_m, Latitude, Longitude, timeframe) %>% 
-    summarise(
-      temp_seasonality = mean(temp_seasonality, na.rm = TRUE),
-      ppt_seasonality = mean(ppt_seasonality, na.rm = TRUE),
-      .groups = "drop"
-    )#get 30 year averages for each climate variable 
+    summarise_at(c("cwd",  "pck", "ppt", "tmn", "tmx", "ann_tmean", "mean_diurnal_range", 
+                   "temp_seasonality", "temp_ann_range",
+                 "tmean_wettest_month", "tmean_driest_month", "ann_ppt",
+                 "ppt_seasonality","ppt_warmest_month", "ppt_coldest_month"),
+               c(mean), na.rm = TRUE) #get 30 year averages for each climate variable 
   
   range_merge <- bind_rows(data_means, garden_range)
   
   garden_home_climate_ranges <- range_merge %>% #calculate ranges
     ungroup() %>% 
-  summarise(
-    temp_seasonality_range = max(temp_seasonality, na.rm = TRUE) - 
-      min (temp_seasonality, na.rm = TRUE),
-    ppt_seasonality_range = max(ppt_seasonality, na.rm = TRUE) - 
-      min (ppt_seasonality, na.rm = TRUE)
-  )
+  summarise(cwd_range=max(cwd)-min(cwd),
+            pck_range=max(pck)-min(pck),
+            ppt_range=max(ppt)-min(ppt), 
+            tmn_range=max(tmn)-min(tmn), 
+            tmx_range=max(tmx)-min(tmx), 
+            ann_tmean_range=max(ann_tmean)-min(ann_tmean),
+            mean_diurnal_range_range=max(mean_diurnal_range)-min(mean_diurnal_range),
+            temp_seasonality_range=max(temp_seasonality)-min(temp_seasonality),
+            temp_ann_range_range=max(temp_ann_range)-min(temp_ann_range),
+            tmean_wettest_month_range=max(tmean_wettest_month)-min(tmean_wettest_month),
+            tmean_driest_month_range=max(tmean_driest_month)-min(tmean_driest_month),
+            ann_ppt_range=max(ann_ppt)-min(ann_ppt), 
+            ppt_seasonality_range=max(ppt_seasonality)-min(ppt_seasonality),
+            ppt_warmest_month_range=max(ppt_warmest_month)-min(ppt_warmest_month), 
+            ppt_coldest_month_range=max(ppt_coldest_month)-min(ppt_coldest_month))
   
   garden_home_climate <- bind_cols(garden_clim, data_means) #add garden climate data to home climate data 
   
   garden_home_climate_with_ranges <- bind_cols(garden_home_climate, garden_home_climate_ranges) #add in ranges 
   
   gowers_calc_each_var <- garden_home_climate_with_ranges %>% #variable by variable calc
-    mutate(temp_seasonality_gowers = abs(temp_seasonality_Garden - temp_seasonality) / temp_seasonality_range,
-           ppt_seasonality_gowers = abs (ppt_seasonality_Garden - ppt_seasonality) / ppt_seasonality_range) %>% 
+  mutate(cwd_gowers=abs(cwd_Garden-cwd) / cwd_range,
+         pck_gowers=abs(pck_Garden-pck) / pck_range,
+         ppt_gowers=abs(ppt_Garden - ppt) / ppt_range,
+         tmn_gowers=abs(tmn_Garden - tmn) / tmn_range,
+         tmx_gowers=abs(tmx_Garden - tmx) / tmx_range,
+         ann_tmean_gowers=abs(ann_tmean_Garden - ann_tmean) / ann_tmean_range,
+         mean_diurnal_range_gowers=abs(mean_diurnal_range_Garden - mean_diurnal_range) / mean_diurnal_range_range,
+         temp_seasonality_gowers=abs(temp_seasonality_Garden - temp_seasonality) / temp_seasonality_range,
+         temp_ann_range_gowers=abs(temp_ann_range_Garden - temp_ann_range) / temp_ann_range_range,
+         tmean_wettest_month_gowers=abs(tmean_wettest_month_Garden - tmean_wettest_month) / tmean_wettest_month_range,
+         tmean_driest_month_gowers=abs(tmean_driest_month_Garden - tmean_driest_month) / tmean_driest_month_range,
+         ann_ppt_gowers=abs(ann_ppt_Garden - ann_ppt) / ann_ppt_range,
+         ppt_seasonality_gowers=abs(ppt_seasonality_Garden - ppt_seasonality) / ppt_seasonality_range,
+         ppt_warmest_month_gowers=abs(ppt_warmest_month_Garden - ppt_warmest_month) / ppt_warmest_month_range,
+         ppt_coldest_month_gowers=abs(ppt_coldest_month_Garden - ppt_coldest_month) / ppt_coldest_month_range) %>% 
   dplyr::select(pop, Elev_class, Elev_m, ends_with("_gowers"))
 
  gowers_calc_per_pop <- gowers_calc_each_var %>% #final gowers calc 
-  mutate(Gowers_Dist=(1/P)*(temp_seasonality_gowers + ppt_seasonality_gowers),
-         Gowers_Dist_temp = temp_seasonality_gowers,
-         Gowers_Dist_ppt = ppt_seasonality_gowers) %>%
+  mutate(Gowers_Dist=(1/P)*(cwd_gowers + pck_gowers + ppt_gowers + tmn_gowers + tmx_gowers +
+                                ann_tmean_gowers + mean_diurnal_range_gowers +
+                                temp_seasonality_gowers +temp_ann_range_gowers +
+                                tmean_wettest_month_gowers +
+                                tmean_driest_month_gowers +ann_ppt_gowers +
+                                ppt_seasonality_gowers + ppt_warmest_month_gowers +
+                                ppt_coldest_month_gowers)) %>%
    dplyr::select(pop, Elev_class, Elev_m, Gowers_Dist)
   
  gowers_calc_per_pop %>% pull(Gowers_Dist) #make the result a vector 
@@ -146,7 +178,7 @@ gowers_calc <- function(data, indices, P, garden_clim, garden_range) { #function
 gowers.boot_cp2_recent <- boot(
   data=recent_wtryr_clim_nest, 
   statistic=gowers_calc, 
-  R=1000, P=2, 
+  R=1000, P=15, 
   garden_clim=cp2_recent_Garden,
   garden_range=cp2_recent_range_prep) #will sample each row (year) with replacement 
 
@@ -169,7 +201,7 @@ boot_gowers_recent_cp2 <- bind_cols(pops, boot_recent_results_cp2) %>%
 gowers.boot_cp2_historic <- boot(
   data=historic_wtryr_clim_nest,
   statistic=gowers_calc,
-  R=1000, P=2,
+  R=1000, P=15,
   garden_clim=cp2_historic_Garden,
   garden_range=cp2_historic_range_prep) 
 #will sample each row (year) with replacement 
@@ -199,13 +231,17 @@ all_CP2_gowers %>%
   ggplot(aes(x=fct_reorder(pop, Elev_m), y=Gowers_Dist, group=pop, fill=Elev_m)) +
   geom_col(width = 0.7,position = position_dodge(0.75)) +
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high),
-                width=.5, position = position_dodge(0.75)) +
-  scale_y_continuous(expand = c(0, 0)) +
+                width=.3, position = position_dodge(0.75)) +
+  scale_y_continuous(expand = c(0,0.02)) +
   scale_fill_gradient(low = "#F5A540", high = "#0043F0") +
   labs(y="Gower Climate Distance from CP2", fill="Elevation (m)", x="Population") +
   theme_classic() +
   theme(text=element_text(size=18), axis.text.x = element_text(size= 9, angle = 45,  hjust = 1)) +
   facet_wrap(~timeframe)
 #ggsave("../output/WtrYr_Clim_CP2.png", width = 24, height = 8, units = "in")
+```
+
+```{r}
+
 ```
 

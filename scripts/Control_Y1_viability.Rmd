@@ -72,7 +72,7 @@ control_prediction_1$predicted <- predict( #calculate predicted viability for ea
 
 ```{r}
 control_figure_1 <- ggplot( #create a ggplot use population level summary data with x-axis in population ordered by ascending elevation in meter and y-axis by mean proportion of viable
-  control_sum_1, aes (x = Elev_m, y = proportion, color = Pop) 
+  control_sum_1, aes (x = Elev_m, y = proportion) 
 ) +
   geom_point(size = 2) + #each populations' mean proportion of viable
    geom_errorbar( #add SE bar

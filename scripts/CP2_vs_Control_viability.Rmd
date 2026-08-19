@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 library(dplyr)
+library(ggplot2)
 ```
 
 ```{r}
@@ -98,5 +99,14 @@ compare_figure_1 <- ggplot(compare_sum_1, aes (x = reorder(Pop, Elev_m), y = pro
   )
 print(compare_figure_1)
 ```
-
+```{r}
+ggsave(
+  "control vs cp2 viability.png",
+  compare_figure_1,
+  width = 10,
+  height = 6,
+  units = "in",
+  dpi = 600
+)
+```
 
