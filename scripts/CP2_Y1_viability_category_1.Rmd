@@ -23,7 +23,7 @@ CP2_Y1 <- read.csv("../output/CP2_Y1_w_elev.csv") %>%
   filter(!(Pop == "WL1" & Rep == 14)) #filter WL1 rep14, because there is no seeds in WL1 rep14 but we have marked it in the spreadsheet; without filter, the NA will be include in the SE and cause all the reps of WL1 become NA
 ```
 
-
+#viability across elevation analysis
 ```{r}
 rep_sum_1 <- CP2_Y1 %>%
   group_by (Pop, Elev_m, Rep) %>% #group seeds data by population, elevation and replicates
@@ -44,8 +44,6 @@ pop_sum_1 <- rep_sum_1 %>%
   )
 print(pop_sum_1)
 ```
-
-
 
 ```{r}
 glm_1 <- glm( #fit a binomial generalized linear model
@@ -73,7 +71,7 @@ print(summary(glm_1))
 
 ```{r}
 figure_1 <- ggplot(pop_sum_1, aes (x = Elev_m, y = mean_proportion, color = Pop)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
-  geom_point(size = 3) + #each populations' mean proportion of viable
+  geom_point(size = 2) + #each populations' mean proportion of viable
   geom_errorbar( #add SE bar
     aes(
       ymin= mean_proportion - SE,
@@ -81,9 +79,6 @@ figure_1 <- ggplot(pop_sum_1, aes (x = Elev_m, y = mean_proportion, color = Pop)
     ),
     width = 50
   ) +
-  #scale_x_break(c(600, 1000)) +
-  #scale_x_break(c(1100, 1600)) +
-  #scale_x_break(c(1700, 2000)) +
   geom_text (aes (label = Pop), vjust = -5, size = 3, show.legend = FALSE) + #label each point with its population name
   geom_line( #add binomial glm trendline by using new prediction data
     data = prediction_1,
@@ -95,16 +90,13 @@ figure_1 <- ggplot(pop_sum_1, aes (x = Elev_m, y = mean_proportion, color = Pop)
   theme_classic() + #use classic ggplot theme
   theme(text=element_text(size=10), axis.text.x = element_text(angle = 45,  hjust = 1)) +
   labs ( #add labels for x-axis and y-axis
-    x = "Population (ordered by ascending elevation in meter)",
+    x = "Elevation (m)",
     y = "Proportion Viable"
   ) 
 print(figure_1)
 ```
 
-
-to do:
-geomjitter can fix the population stack together
-
+#viability across geographical distance
 ```{r}
 distance <- read.csv("../output/CP2_Y1_sites_w_distance_elev_diff.csv")
 ```
@@ -139,19 +131,14 @@ prediction_distance$predicted <- predict( #calculate predicted viability across 
 )
 
 print(summary(glm_distance))
-```
-###Geographic distance from the common garden significantly affected seed viability after one year of burial (binomial GLM, P < 0.001).
-
-```{r}
 anova(glm_distance, test = "Chisq")
 ```
-###Geographic distance from the common garden significantly affected seed viability following one year of burial (Analysis of Deviance, χ² = 14.13, df = 1, P < 0.001).
 
 ```{r}
 figuer_distance <- ggplot ( #create a plot of population mean viability against geographic distance
   pop_sum_1, aes (x = distance_km, y = mean_proportion)
 ) + 
-  geom_point(size = 2.5) + #plot the mean proportion of viable seeds for each population
+  geom_point(size = 2) + #plot the mean proportion of viable seeds for each population
   geom_errorbar( #add SE bar
     aes(
       ymin= mean_proportion - SE,
@@ -180,6 +167,7 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
 print(figuer_distance)
 ```
 
+#viability across climate distance
 ```{r}
 climate_distance <- read.csv("../output/CP2_Climate_Distance.csv")
 ```
@@ -223,9 +211,6 @@ glm_climate_historic <- glm(
 
 print(summary(glm_climate_recent))
 print(summary(glm_climate_historic))
-```
-
-```{r}
 anova(glm_climate_recent, test = "Chisq")
 anova(glm_climate_historic, test = "Chisq")
 ```
@@ -302,3 +287,158 @@ ggplot(pop_historic, aes (x = Gowers_Dist, y = mean_proportion)) +
   labs(x = "Gower Climate Distance from CP2 (1965-1994)", y = "Proportion Viable")
 ```
 
+
+#environmental variability by population
+```{r}
+all_clim <- read.csv("../output/WtrYr_Clim_2025NoOct.csv")
+```
+
+```{r}
+recent_vari <- all_clim %>%
+  filter(timeframe == "recent", year >= 1995, year <= 2025, Season == "Water Year", pop != "CP2_garden") %>%
+  group_by (pop, Elev_class, Elev_m, Latitude, Longitude) %>%
+  summarise(across(cwd:ppt_coldest_month, ~sd(.x, na.rm = TRUE), .names = "{.col}_sd"), .groups = "drop")
+recent_vari_scaled <- recent_vari %>%
+  mutate(across(ends_with("_sd"), ~(.x - min(.x, na.rm = TRUE))/(max(.x, na.rm = TRUE) - min(.x, na.rm = TRUE)), .names = "{.col}_scaled"))
+recent_vari_scaled <- recent_vari_scaled %>%
+  rowwise() %>%
+  mutate(
+    envi_vari = mean(
+      c_across(ends_with("_sd_scaled")),
+      na.rm = TRUE
+    )
+  ) %>%
+  ungroup() %>%
+  mutate(timeframe = "Recent")
+recent_envi_vari <- recent_vari_scaled %>%
+  select(pop, Elev_class, Elev_m, Latitude, Longitude, timeframe, envi_vari) %>%
+  arrange(envi_vari)
+
+historic_vari <- all_clim %>%
+  filter(timeframe == "historic", year >= 1965, year <= 1994, Season == "Water Year", pop != "CP2_garden") %>%
+  group_by (pop, Elev_class, Elev_m, Latitude, Longitude) %>%
+  summarise(across(cwd:ppt_coldest_month, ~sd(.x, na.rm = TRUE), .names = "{.col}_sd"), .groups = "drop")
+historic_vari_scaled <- historic_vari %>%
+  mutate(across(ends_with("_sd"), ~(.x - min(.x, na.rm = TRUE))/(max(.x, na.rm = TRUE) - min(.x, na.rm = TRUE)), .names = "{.col}_scaled"))
+historic_vari_scaled <- historic_vari_scaled %>%
+  rowwise() %>%
+  mutate(
+    envi_vari = mean(
+      c_across(ends_with("_sd_scaled")),
+      na.rm = TRUE
+    )
+  ) %>%
+  ungroup() %>%
+  mutate(timeframe = "Historic")
+historic_envi_vari <- historic_vari_scaled %>%
+  select(pop, Elev_class, Elev_m, Latitude, Longitude, timeframe, envi_vari) %>%
+  arrange(envi_vari)
+
+all_envi_vari <- bind_rows(recent_envi_vari, historic_envi_vari)
+#write_csv(all_envi_vari, "../output/CP2_Environmental_Variability.csv")
+```
+
+```{r}
+envi_vari_figure<-all_envi_vari %>%
+  ggplot(aes(x = fct_reorder(pop, Elev_m), y = envi_vari, fill = Elev_m)) +
+  geom_col(width = 0.8) +
+  scale_fill_gradient(low = "#F5A540", high = "#0043F0") +
+  facet_wrap(~timeframe) +
+  theme_classic() +
+  scale_y_continuous(expand = c(0, 0.01))+
+  labs(x = "Population", y = "Composite Environmental Variability", fill = "Elevation (m)") +
+  theme(text = element_text (size = 18), axis.text.x = element_text(size = 9, angle = 45, hjust = 1))
+print(envi_vari_figure)
+```
+
+#viability across environmental variability
+```{r}
+rep_sum_envi_recent <- rep_sum_1 %>%
+  left_join(recent_envi_vari %>% select(pop, envi_vari), by = c("Pop" = "pop"))
+rep_sum_envi_historic <- rep_sum_1 %>%
+  left_join(historic_envi_vari %>% select(pop, envi_vari), by = c("Pop" = "pop"))
+
+glm_envi_recent <- glm(
+  cbind(events, trials - events) ~ envi_vari,
+  family = binomial,
+  data = rep_sum_envi_recent
+)
+glm_envi_historic <- glm(
+  cbind (events, trials - events) ~envi_vari,
+  family = binomial,
+  data = rep_sum_envi_historic
+)
+
+anova(glm_envi_recent, test = "Chisq")
+anova(glm_envi_historic, test = "Chisq")
+
+print(summary(glm_envi_recent))
+print(summary(glm_envi_historic))
+```
+
+```{r}
+prediction_envi_recent <- data.frame(
+  envi_vari = seq(
+    min(rep_sum_envi_recent$envi_vari),
+    max(rep_sum_envi_recent$envi_vari),
+    length.out=100
+  )
+)
+prediction_envi_recent$predicted <- predict(
+  glm_envi_recent,
+  newdata=prediction_envi_recent,
+  type = "response"
+)
+
+prediction_envi_historic <- data.frame(
+  envi_vari = seq(
+    min(rep_sum_envi_historic$envi_vari),
+    max(rep_sum_envi_historic$envi_vari),
+    length.out=100
+  )
+)
+prediction_envi_historic$predicted <- predict(
+  glm_envi_historic,
+  newdata=prediction_envi_historic,
+  type = "response"
+)
+```
+
+```{r}
+pop_envi_recent <- pop_sum_1 %>%
+  left_join(recent_envi_vari %>% select(pop, envi_vari), by = c ("Pop" = "pop"))
+pop_envi_historic <- pop_sum_1 %>%
+  left_join(historic_envi_vari %>% select(pop, envi_vari), by = c("Pop" = "pop"))
+```
+
+```{r}
+figure_envi_recent <- ggplot(pop_envi_recent, aes (x = envi_vari, y = mean_proportion)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
+  geom_text(aes(label = Pop), vjust = -4.8) +
+  geom_line(data = prediction_envi_recent, aes(x = envi_vari, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+  scale_y_continuous(expand = c(0, 0.04)) +
+  scale_x_continuous(n.breaks = 7) +
+  theme_classic() +
+  labs(
+    x = "Recent Composite Environmental Variability (1995-2025)",
+    y = "Proportion Viable"
+  )
+print(figure_envi_recent)
+```
+
+```{r}
+figure_envi_historic <- ggplot(pop_envi_historic, aes (x = envi_vari, y = mean_proportion)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
+  geom_text(aes(label = Pop), vjust = -4.8) +
+  geom_line(data = prediction_envi_historic, aes(x = envi_vari, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+  scale_y_continuous(expand = c(0, 0.04)) +
+  scale_x_continuous(n.breaks = 7) +
+  theme_classic() +
+  labs(
+    x = "Historic Composite Environmental Variability (1965-1994)",
+    y = "Proportion Viable"
+  )
+print(figure_envi_historic)
+```
