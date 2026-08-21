@@ -70,21 +70,55 @@ print(summary(glm_123))
 ```
 
 ```{r}
-figure_123 <- ggplot(pop_sum_123, aes (x = Elev_m, y = mean_proportion, color = Pop)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
-  geom_point(size = 2) + #each populations' mean proportion of viable
-  geom_errorbar( #add SE bar
-    aes(
-      ymin= mean_proportion - SE,
-      ymax = mean_proportion + SE, color = Pop
-    ),
-    width = 50
-  ) +
-  geom_text (aes (label = Pop), vjust = -5, size = 3, show.legend = FALSE) + #label each point with its population name
+figure_123 <- ggplot(pop_sum_123, aes (x = Elev_m, y = mean_proportion)) + #create a ggplot use population level summary data with x-axis in elevation by meter and y-axis by mean proportion of viable
   geom_line( #add binomial glm trendline by using new prediction data
     data = prediction_123,
     aes(x = Elev_m, y = predicted, group = 1), #plot predicted viability across elevation
     linewidth = 1, color = "red"
   ) +
+  geom_point(aes(x = case_when(Pop == "WL3" ~ Elev_m - 50, Pop == "YOSE1" ~Elev_m + 50, TRUE ~ Elev_m)), size = 2) + #each populations' mean proportion of viable
+  geom_errorbar( #add SE bar
+    aes(x = case_when(Pop == "WL3" ~ Elev_m - 50, Pop == "YOSE1" ~Elev_m + 50, TRUE ~ Elev_m),
+      ymin= mean_proportion - SE,
+      ymax = mean_proportion + SE, 
+    ),
+    width = 20
+  ) +
+ # geom_text (aes (label = Pop), vjust = -5, size = 3, show.legend = FALSE) + #label each point with its population name
+  geom_text(
+  aes(
+    x = Elev_m + case_when(
+      Pop == "BH"    ~ 0,
+      Pop == "DPR"   ~ 0,
+      Pop == "IH"    ~ 0,
+      Pop == "LV2"   ~ 0,
+      Pop == "SC"    ~ 0,
+      Pop == "SQ3"   ~ 0,
+      Pop == "TM2"   ~ 0,
+      Pop == "WL1"   ~ 0,
+      Pop == "WL2"   ~ 0,
+      Pop == "WL3"   ~ -50,
+      Pop == "YOSE1" ~ 50,
+      TRUE ~ 0
+    ),
+    y = mean_proportion + case_when(
+      Pop == "BH"    ~ 0.06,
+      Pop == "DPR"   ~ 0.045,
+      Pop == "IH"    ~ 0.06,
+      Pop == "LV2"   ~ 0.055,
+      Pop == "SC"    ~ 0.055,
+      Pop == "SQ3"   ~ 0.07,
+      Pop == "TM2"   ~ 0.05,
+      Pop == "WL1"   ~ 0.06,
+      Pop == "WL2"   ~ 0.06,
+      Pop == "WL3"   ~ 0.055,
+      Pop == "YOSE1" ~ 0.06,
+      TRUE ~ 0
+    ),
+    label = Pop
+  ),
+  size = 2.5
+) +
   scale_x_continuous(limits = c(350, 2550), n.break = 15) +
   scale_y_continuous(expand = c(0, 0.02)) +
   theme_classic() + #use classic ggplot theme
@@ -138,15 +172,6 @@ anova(glm_distance, test = "Chisq")
 figuer_distance <- ggplot ( #create a plot of population mean viability against geographic distance
   pop_sum_123, aes (x = distance_km, y = mean_proportion)
 ) + 
-  geom_point(size = 2) + #plot the mean proportion of viable seeds for each population
-  geom_errorbar( #add SE bar
-    aes(
-      ymin= mean_proportion - SE,
-      ymax = mean_proportion + SE
-    ),
-    width = 5
-  ) +
-  geom_text (aes (label = Pop), vjust = -6.1, size = 3) + #label each point with its population name
   geom_line(
   data = prediction_distance,
   aes(
@@ -155,6 +180,49 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
   ),
   linewidth = 1,
   color = "red" #add the fitted binomial glm prediction line
+) +
+  geom_point(size = 2) + #plot the mean proportion of viable seeds for each population
+  geom_errorbar( #add SE bar
+    aes(
+      ymin= mean_proportion - SE,
+      ymax = mean_proportion + SE
+    ),
+    width = 3
+  ) +
+  #geom_text (aes (label = Pop), vjust = -6.1, size = 3) + #label each point with its population name
+  geom_text(
+  aes(
+    x = distance_km + case_when(
+      Pop == "BH"    ~ 0,
+      Pop == "DPR"   ~ 0,
+      Pop == "IH"    ~ 0,
+      Pop == "LV2"   ~ 0,
+      Pop == "SC"    ~ 0,
+      Pop == "SQ3"   ~ 0,
+      Pop == "TM2"   ~ 0,
+      Pop == "WL1"   ~ 0,
+      Pop == "WL2"   ~ 0,
+      Pop == "WL3"   ~ 0,
+      Pop == "YOSE1" ~ 0,
+      TRUE ~ 0
+    ),
+    y = mean_proportion + case_when(
+      Pop == "BH"    ~ 0.065,
+      Pop == "DPR"   ~ 0.045,
+      Pop == "IH"    ~ 0.06,
+      Pop == "LV2"   ~ 0.055,
+      Pop == "SC"    ~ 0.055,
+      Pop == "SQ3"   ~ 0.065,
+      Pop == "TM2"   ~ 0.05,
+      Pop == "WL1"   ~ 0.06,
+      Pop == "WL2"   ~ 0.06,
+      Pop == "WL3"   ~ 0.05,
+      Pop == "YOSE1" ~ 0.055,
+      TRUE ~ 0
+    ),
+    label = Pop
+  ),
+  size = 2.5
 ) +
   scale_x_continuous(n.breaks = 10) +
   scale_y_continuous(expand = c(0, 0.03)) +
@@ -263,11 +331,45 @@ pop_historic <- rep_sum_historic %>%
 
 ```{r}
 ggplot(pop_recent, aes(x = Gowers_Dist, y = mean_proportion)) +
+  geom_line(data = prediction_climate_recent, aes(x = Gowers_Dist, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
   geom_point(size = 2) +
   geom_errorbar(
-    aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
-  geom_text(aes(label = Pop, vjust = -6), size = 3) +
-  geom_line(data = prediction_climate_recent, aes(x = Gowers_Dist, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
+    aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.009) +
+  #geom_text(aes(label = Pop, vjust = -6), size = 3) +
+  geom_text(
+  aes(
+    x = Gowers_Dist + case_when(
+      Pop == "BH"    ~ 0,
+      Pop == "DPR"   ~ 0,
+      Pop == "IH"    ~ 0,
+      Pop == "LV2"   ~ 0,
+      Pop == "SC"    ~ 0,
+      Pop == "SQ3"   ~ 0,
+      Pop == "TM2"   ~ 0,
+      Pop == "WL1"   ~ 0,
+      Pop == "WL2"   ~ 0,
+      Pop == "WL3"   ~ 0,
+      Pop == "YOSE1" ~ 0,
+      TRUE ~ 0
+    ),
+    y = mean_proportion + case_when(
+      Pop == "BH"    ~ 0.065,
+      Pop == "DPR"   ~ 0.04,
+      Pop == "IH"    ~ 0.07,
+      Pop == "LV2"   ~ 0.06,
+      Pop == "SC"    ~ 0.055,
+      Pop == "SQ3"   ~ 0.08,
+      Pop == "TM2"   ~ 0.05,
+      Pop == "WL1"   ~ 0.06,
+      Pop == "WL2"   ~ 0.07,
+      Pop == "WL3"   ~ 0.06,
+      Pop == "YOSE1" ~ 0.07,
+      TRUE ~ 0
+    ),
+    label = Pop
+  ),
+  size = 2.5
+) +
   scale_x_continuous(n.breaks = 7) +
   scale_y_continuous(expand = c(0, 0.03)) +
   theme_classic() +
@@ -420,8 +522,41 @@ figure_envi_recent <- ggplot(pop_envi_recent, aes (x = envi_vari, y = mean_propo
   geom_line(data = prediction_envi_recent, aes(x = envi_vari, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
   geom_point(size = 2) +
   geom_errorbar(aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
-  geom_text(aes(label = Pop), vjust = -7.5, size = 2.5) +
-  
+  #geom_text(aes(label = Pop), vjust = -7.5, size = 2.5) +
+  geom_text(
+  aes(
+    x = envi_vari + case_when(
+      Pop == "BH"    ~ 0,
+      Pop == "DPR"   ~ 0,
+      Pop == "IH"    ~ 0,
+      Pop == "LV2"   ~ 0,
+      Pop == "SC"    ~ 0,
+      Pop == "SQ3"   ~ 0,
+      Pop == "TM2"   ~ 0,
+      Pop == "WL1"   ~ 0,
+      Pop == "WL2"   ~ 0,
+      Pop == "WL3"   ~ 0,
+      Pop == "YOSE1" ~ 0,
+      TRUE ~ 0
+    ),
+    y = mean_proportion + case_when(
+      Pop == "BH"    ~ 0.065,
+      Pop == "DPR"   ~ 0.04,
+      Pop == "IH"    ~ 0.07,
+      Pop == "LV2"   ~ 0.06,
+      Pop == "SC"    ~ 0.06,
+      Pop == "SQ3"   ~ 0.08,
+      Pop == "TM2"   ~ 0.05,
+      Pop == "WL1"   ~ -0.07,
+      Pop == "WL2"   ~ -0.06,
+      Pop == "WL3"   ~ 0.06,
+      Pop == "YOSE1" ~ 0.06,
+      TRUE ~ 0
+    ),
+    label = Pop
+  ),
+  size = 2.5
+) +
   scale_y_continuous(expand = c(0, 0.04)) +
   scale_x_continuous(n.breaks = 7) +
   theme_classic() +
