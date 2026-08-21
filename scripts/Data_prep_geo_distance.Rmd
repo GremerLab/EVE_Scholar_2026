@@ -37,8 +37,29 @@ coordinate
 ```
 
 ```{r}
+cp2_elev <- distance %>%
+  filter(Pop == "CP2") %>%
+  pull(Elev_m)
+print(cp2_elev)
+elev_distance <- distance %>%
+  mutate(
+    elev_diff = abs(Elev_m - cp2_elev)
+  )
+print(elev_distance)
+```
+
+```{r}
 coordinate <- coordinate %>%
   select(c("Pop", "Elev_m", "Elev_class", "distance_km"))
 #write_csv(coordinate, "../output/CP2_Y1_sites_w_distance_km.csv")
 ```
+```{r}
+coordinate <- coordinate %>%
+  left_join (
+    elev_distance %>%
+      select (Pop, elev_diff), by = "Pop"
+  )
+write_csv(coordinate, "../output/CP2_Y1_sites_w_distance_km.csv")
+```
+
 

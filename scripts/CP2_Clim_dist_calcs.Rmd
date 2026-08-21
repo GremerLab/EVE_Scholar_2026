@@ -5,6 +5,11 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
+## Data Dependencies
+
+To reproduce the processed climate data used in this script from the raw data, run:
+- `Data_prep_climate_data.Rmd`
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```

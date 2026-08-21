@@ -6,6 +6,12 @@ output:
 date: "2026-08-10"
 ---
 
+## Data Dependencies
+
+To reproduce the processed data from the raw data, run:
+- `Data_prep_merge_elev_info.Rmd`
+- `Data_prep_update_viability_categories.Rmd`
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
