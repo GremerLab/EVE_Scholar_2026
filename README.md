@@ -1,6 +1,6 @@
 # EVE_Scholar_2026
 ## Repository Structure
-
+ 
 - **Raw data**
   - Raw and source data files are stored in the `input/` folder.
   - `CP2_Y1_viability_data.csv`
