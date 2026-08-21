@@ -415,7 +415,7 @@ ggplot(pop_historic, aes (x = Gowers_Dist, y = mean_proportion)) +
   geom_errorbar(
     aes(ymin = mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
   geom_text(aes(label = Pop, vjust = -5.8), size = 3) +
-  scale_x_continuous(n.breaks = 7) +
+  scale_x_continuous(n.breaks = 10) +
   scale_y_continuous(limits = c(.35, .85)) +
   theme_classic() +
   labs(x = "Gower Climate Distance from CP2 (1965-1994)", y = "Proportion Viable")
@@ -592,7 +592,7 @@ figure_envi_recent <- ggplot(pop_envi_recent, aes (x = envi_vari, y = mean_propo
 ) +
   
   scale_y_continuous(expand = c(0, 0.04)) +
-  scale_x_continuous(n.breaks = 7) +
+  scale_x_continuous(n.breaks = 10) +
   theme_classic() +
   labs(
     x = "Recent Environmental Variability (1995-2025)",
