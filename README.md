@@ -59,9 +59,9 @@
 
 - `Control_Y1_viability.Rmd`
   - This script provides an alternative viability definition for comparison with the other CP2 viability analyses.
-  - Analyzes CP2 Year 1 seed viability using only viability Category 1 as viable.
-  - Analyzes CP2 Year 1 seed viability using Categories 1 and 2 as viable.
-  - Analyzes CP2 Year 1 seed viability using Categories 1, 2, and 3 as viable.
+  - Analyzes control seed viability using only Category 1 as viable.
+  - Analyzes control seed viability using Categories 1 and 2 as viable.
+  - Analyzes control seed viability using Categories 1, 2, and 3 as viable.
   - Includes analysis of control-seed viability in relation to source-population elevation.
 
 - `CP2_vs_Control_viability.Rmd`
