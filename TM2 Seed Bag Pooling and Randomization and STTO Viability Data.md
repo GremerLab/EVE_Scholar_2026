@@ -4,7 +4,7 @@ Summer 2026 EVE Scholar analysis of seed viability data
    - **Data Collection**
      - These data were collected for the EVE Scholars 2026 one-year and two-year *Streptanthus tortuosus* seed burial experiment.
      - The spreadsheet recorded seed pooling, maternal-family seed allocation, bag identification, and burial/randomization design of the TM2 seed bag experiment.
-
+ 
    - **Data Collectors**
      - Chelsea collected data for the `Number of seeds per MF` and `Remaining 2025 LV2 and SQ3 seed counts` tabs.
      - Maya collected data for the `TM2 Seed Pooling`, `Pop, Rep, Year Key`, and `TM2 Seed Bag Randomization` tabs.
