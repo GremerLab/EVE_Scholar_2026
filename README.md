@@ -52,7 +52,7 @@ Summer 2026 EVE Scholar analysis of seed viability data
        - `Bag_ID` = identifier combining source population, retrieval year, replicate number, and location
    
    - **Data transformations, estimates, and calculations**
-    - All data included here are raw, directly recorded or observed data. Data transformations and calculations used for analysis were performed separately in the analysis scripts, and the resulting processed data are stored in the GitHub repository outputs.
+       - All data included here are raw, directly recorded or observed data. Data transformations and calculations used for analysis were performed separately in the analysis scripts, and the resulting processed data are stored in the GitHub repository outputs.
 
 
 2. **STTO Viability Data**
