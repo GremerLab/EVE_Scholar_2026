@@ -28,8 +28,17 @@ library(ggplot2)
 
 
 ```{r}
+annual_pops <- c("TM2", "SC", "DPR")
 CP2_Y1 <- read.csv("../output/CP2_Y1_w_elev.csv") %>%
-  filter(!(Pop == "WL1" & Rep == 14)) #filter WL1 rep14, because there is no seeds in WL1 rep14 but we have marked it in the spreadsheet; without filter, the NA will be include in the SE and cause all the reps of WL1 become NA
+  filter(!(Pop == "WL1" & Rep == 14)) %>%
+  filter(!Pop %in% annual_pops)
+#filter WL1 rep14, because there is no seeds in WL1 rep14 but we have marked it in the spreadsheet; without filter, the NA will be include in the SE and cause all the reps of WL1 become NA
+```
+
+```{r}
+CP2_Y1_annual <- read.csv("../output/CP2_Y1_w_elev.csv") %>%
+  filter(!(Pop == "WL1" & Rep == 14)) %>%
+  filter(Pop %in% annual_pops)
 ```
 
 #viability across elevation analysis
@@ -53,6 +62,27 @@ pop_sum_12 <- rep_sum_12 %>%
   )
 print(pop_sum_12)
 ```
+
+```{r}
+annual_rep_sum <- CP2_Y1_annual %>%
+  group_by(Pop, Elev_m, Rep) %>%
+  summarise(
+    trials = sum(!is.na(Updated_viability_cat)),
+    events = sum(Updated_viability_cat %in% c(1, 2), na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(proportion = events / trials)
+
+annual_pop_sum <- annual_rep_sum %>%
+  group_by(Pop, Elev_m) %>%
+  summarise(
+    n_reps = n(),
+    mean_proportion = mean(proportion, na.rm = TRUE),
+    SE = sd(proportion, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  )
+```
+
 
 ```{r}
 glm_12 <- glm( #fit a binomial generalized linear model
@@ -93,6 +123,36 @@ figure_12 <- ggplot(pop_sum_12, aes (x = Elev_m, y = mean_proportion)) + #create
     ),
     width = 20
   ) +
+  geom_errorbar(
+  data = annual_pop_sum,
+  aes(
+    x = Elev_m,
+    ymin = mean_proportion - SE,
+    ymax = mean_proportion + SE
+  ),
+  width = 30, color = "blue",
+  inherit.aes = FALSE
+) +
+geom_point(
+  data = annual_pop_sum,
+  aes(
+    x = Elev_m,
+    y = mean_proportion
+  ),
+  shape = 17,
+  size = 3, color = "blue",
+  inherit.aes = FALSE
+) +
+geom_text(
+  data = annual_pop_sum,
+  aes(
+    x = Elev_m,
+    y = mean_proportion,
+    label = Pop
+  ),
+  vjust = -5.3, size = 2,color = "blue",
+  inherit.aes = FALSE
+)+
   geom_text(
   aes(
     x = Elev_m + case_when(
@@ -137,6 +197,16 @@ figure_12 <- ggplot(pop_sum_12, aes (x = Elev_m, y = mean_proportion)) + #create
   ) 
 print(figure_12)
 ```
+```{r}
+ggsave(
+  "viable x elevation (m).png",
+  figure_12,
+  width = 10,
+  height = 7,
+  units = "in",
+  dpi = 600
+)
+```
 
 #viability across geographical distance
 ```{r}
@@ -150,6 +220,12 @@ pop_sum_12 <- pop_sum_12 %>%
 rep_sum_12 <- rep_sum_12 %>%
   left_join(distance %>% select (distance_km, Pop), by = "Pop") #join distance with replicate level data
 ```
+
+```{r}
+annual_pop_sum <- annual_pop_sum %>%
+  left_join(distance %>% select(distance_km, Pop), by = "Pop")
+```
+
 
 ```{r}
 glm_distance <- glm( #fit a binomial generalized linear model
@@ -187,7 +263,8 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
     y = predicted
   ),
   linewidth = 1,
-  color = "red" #add the fitted binomial glm prediction line
+  color = "red",
+  inherit.aes = FALSE #add the fitted binomial glm prediction line
 ) +
   geom_point(size = 2.5) + #plot the mean proportion of viable seeds for each population
   geom_errorbar( #add SE bar
@@ -198,6 +275,36 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
     width = 3
   ) +
   #geom_text (aes (label = Pop), vjust = -6.1, size = 3) + #label each point with its population name
+   geom_errorbar(
+  data = annual_pop_sum,
+  aes(
+    x = distance_km,
+    ymin = mean_proportion - SE,
+    ymax = mean_proportion + SE
+  ),
+  width = 3, color = "blue",
+  inherit.aes = FALSE
+) +
+geom_point(
+  data = annual_pop_sum,
+  aes(
+    x = distance_km,
+    y = mean_proportion
+  ),
+  shape = 17,
+  size = 3, color = "blue",
+  inherit.aes = FALSE
+) +
+geom_text(
+  data = annual_pop_sum,
+  aes(
+    x = distance_km,
+    y = mean_proportion,
+    label = Pop
+  ),
+  vjust = -5, size = 2.5,color = "blue",
+  inherit.aes = FALSE
+)+
   geom_text(
   aes(
     x = distance_km + case_when(
@@ -241,6 +348,17 @@ figuer_distance <- ggplot ( #create a plot of population mean viability against 
     y = "Proportion Viable"
   )
 print(figuer_distance)
+```
+
+```{r}
+ggsave(
+  "Geographic Distance from CP2 (km).png",
+  figuer_distance,
+  width = 10,
+  height = 7,
+  units = "in",
+  dpi = 600
+)
 ```
 
 #viability across climate distance
@@ -338,12 +456,58 @@ pop_historic <- rep_sum_historic %>%
 ```
 
 ```{r}
-ggplot(pop_recent, aes(x = Gowers_Dist, y = mean_proportion)) +
+annual_recent <- annual_pop_sum %>%
+  left_join(
+    gowers_recent %>%
+      select(pop, Gowers_Dist),
+    by = c("Pop" = "pop")
+  )
+```
+
+
+```{r}
+climate_distance_figure_re <- ggplot(pop_recent, aes(x = Gowers_Dist, y = mean_proportion)) +
   geom_line(data = prediction_climate_recent, aes(x = Gowers_Dist, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
   geom_point(size = 2) +
   geom_errorbar(
     aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
   #geom_text(aes(label = Pop, vjust = -6), size = 3) +
+  geom_errorbar(
+  data = annual_recent,
+  aes(
+    x = Gowers_Dist,
+    ymin = mean_proportion - SE,
+    ymax = mean_proportion + SE
+  ),
+  width = 0.01,
+  color = "blue",
+  inherit.aes = FALSE
+) +
+
+geom_point(
+  data = annual_recent,
+  aes(
+    x = Gowers_Dist,
+    y = mean_proportion
+  ),
+  shape = 17,
+  size = 3,
+  color = "blue",
+  inherit.aes = FALSE
+) +
+
+geom_text(
+  data = annual_recent,
+  aes(
+    x = Gowers_Dist,
+    y = mean_proportion,
+    label = Pop
+  ),
+  vjust = -5,
+  size = 2.5,
+  color = "blue",
+  inherit.aes = FALSE
+) +
   geom_text(
   aes(
     x = Gowers_Dist + case_when(
@@ -382,7 +546,20 @@ ggplot(pop_recent, aes(x = Gowers_Dist, y = mean_proportion)) +
   scale_y_continuous(expand = c(0, 0.05)) +
   theme_classic() +
   labs(x = "Gower Climate Distance from CP2 (1995-2025)", y = "Proportion Viable")
+print(climate_distance_figure_re)
 ```
+
+```{r}
+ggsave(
+  "climate distance from cp2 (recent).png",
+  climate_distance_figure_re,
+  width = 10,
+  height = 7,
+  units = "in",
+  dpi = 600
+)
+```
+
 
 ```{r}
 ggplot(pop_historic, aes (x = Gowers_Dist, y = mean_proportion)) +
@@ -526,11 +703,62 @@ pop_envi_historic <- pop_sum_12 %>%
 ```
 
 ```{r}
+annual_envi_recent <- annual_pop_sum %>%
+  left_join(
+    recent_envi_vari %>% select(pop, envi_vari),
+    by = c("Pop" = "pop")
+  )
+
+annual_envi_historic <- annual_pop_sum %>%
+  left_join(
+    historic_envi_vari %>% select(pop, envi_vari),
+    by = c("Pop" = "pop")
+  )
+```
+
+
+```{r}
 figure_envi_recent <- ggplot(pop_envi_recent, aes (x = envi_vari, y = mean_proportion)) +
   geom_line(data = prediction_envi_recent, aes(x = envi_vari, y = predicted), inherit.aes = FALSE, color = "red", linewidth = 1) +
   geom_point(size = 2) +
   geom_errorbar(aes(ymin= mean_proportion - SE, ymax = mean_proportion + SE), width = 0.01) +
   #geom_text(aes(label = Pop), vjust = -7.5, size = 2.5) +
+  geom_errorbar(
+  data = annual_envi_recent,
+  aes(
+    x = envi_vari,
+    ymin = mean_proportion - SE,
+    ymax = mean_proportion + SE
+  ),
+  width = 0.01,
+  color = "blue",
+  inherit.aes = FALSE
+) +
+
+geom_point(
+  data = annual_envi_recent,
+  aes(
+    x = envi_vari,
+    y = mean_proportion
+  ),
+  shape = 17,
+  size = 3,
+  color = "blue",
+  inherit.aes = FALSE
+) +
+
+geom_text(
+  data = annual_envi_recent,
+  aes(
+    x = envi_vari,
+    y = mean_proportion,
+    label = Pop
+  ),
+  vjust = -5,
+  size = 2.5,
+  color = "blue",
+  inherit.aes = FALSE
+) +
    geom_text(
   aes(
     x = envi_vari + case_when(
@@ -553,9 +781,9 @@ figure_envi_recent <- ggplot(pop_envi_recent, aes (x = envi_vari, y = mean_propo
       Pop == "IH"    ~ 0.07,
       Pop == "LV2"   ~ 0.06,
       Pop == "SC"    ~ 0.06,
-      Pop == "SQ3"   ~ 0.08,
+      Pop == "SQ3"   ~ 0.07,
       Pop == "TM2"   ~ 0.05,
-      Pop == "WL1"   ~ -0.07,
+      Pop == "WL1"   ~ -0.06,
       Pop == "WL2"   ~ -0.06,
       Pop == "WL3"   ~ 0.06,
       Pop == "YOSE1" ~ 0.06,
@@ -573,6 +801,16 @@ figure_envi_recent <- ggplot(pop_envi_recent, aes (x = envi_vari, y = mean_propo
     y = "Proportion Viable"
   )
 print(figure_envi_recent)
+```
+```{r}
+ggsave(
+  "environmental variability (recent).png",
+  figure_envi_recent,
+  width = 10,
+  height = 7,
+  units = "in",
+  dpi = 600
+)
 ```
 
 ```{r}
